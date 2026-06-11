@@ -1,6 +1,6 @@
 # tree-sitter-clean
 
-[![CI][ci]](https://github.com/tree-sitter/tree-sitter-clean/actions/workflows/ci.yml)
+[![CI][ci]](https://github.com/ishaq2321/tree-sitter-clean/actions/workflows/ci.yml)
 [![discord][discord]](https://discord.gg/w7nTvsVJhm)
 [![matrix][matrix]](https://matrix.to/#/#tree-sitter-chat:matrix.org)
 [![crates][crates]](https://crates.io/crates/tree-sitter-clean)
@@ -58,7 +58,7 @@ import tree_sitter_clean
 - [Clean Language Report](https://clean-lang.org/)
 - [Clean Book](https://clean.cs.ru.nl/Clean)
 
-[ci]: https://img.shields.io/github/actions/workflow/status/tree-sitter/tree-sitter-clean/ci.yml?logo=github&label=CI
+[ci]: https://img.shields.io/github/actions/workflow/status/ishaq2321/tree-sitter-clean/ci.yml?logo=github&label=CI
 [discord]: https://img.shields.io/discord/1063097320771698699?logo=discord&label=discord
 [matrix]: https://img.shields.io/matrix/tree-sitter-chat%3Amatrix.org?logo=matrix&label=matrix
 [npm]: https://img.shields.io/npm/v/tree-sitter-clean?logo=npm
