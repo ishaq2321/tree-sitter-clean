@@ -1,0 +1,24 @@
+[package]
+name = "tree-sitter-clean"
+description = "Clean grammar for tree-sitter"
+version = "1.0.0"
+license = "MIT"
+readme = "README.md"
+authors = ["Ishaq Muhammad <ishaq2321@users.noreply.github.com>"]
+categories = ["parsing", "text-editors"]
+keywords = ["clean", "tree-sitter", "parser", "grammar"]
+repository = "https://github.com/tree-sitter/tree-sitter-clean"
+edition = "2021"
+rust-version = "1.70"
+
+[lib]
+path = "bindings/rust/lib.rs"
+
+[dependencies]
+tree-sitter-language = "0.1"
+
+[dev-dependencies]
+tree-sitter = "0.25"
+
+[build-dependencies]
+cc = "1.1"

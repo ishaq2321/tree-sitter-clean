@@ -1,0 +1,33 @@
+{
+  "grammars": [
+    {
+      "name": "clean",
+      "camelcase": "Clean",
+      "scope": "source.clean",
+      "file-types": [
+        "icl",
+        "dcl",
+        "abc"
+      ],
+      "highlights": "queries/highlights.scm",
+      "tags": "queries/tags.scm",
+      "injection-regex": "^(icl|dcl|abc)$"
+    }
+  ],
+  "metadata": {
+    "version": "1.0.0",
+    "license": "MIT",
+    "description": "Clean grammar for tree-sitter",
+    "authors": [
+      {
+        "name": "Ishaq Muhammad",
+        "email": "ishaq2321@users.noreply.github.com",
+        "url": "https://github.com/ishaq2321"
+      }
+    ],
+    "links": {
+      "repository": "https://github.com/tree-sitter/tree-sitter-clean",
+      "homepage": "https://github.com/tree-sitter/tree-sitter-clean"
+    }
+  }
+}

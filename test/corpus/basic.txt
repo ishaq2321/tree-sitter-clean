@@ -1,0 +1,172 @@
+==================
+Module Declaration
+==================
+module Test
+---
+
+(source_file
+  (module_declaration
+    (identifier)))
+
+==================
+Import Declaration
+==================
+import StdEnv
+---
+
+(source_file
+  (import_declaration
+    (identifier)))
+
+==================
+Import with from
+==================
+from StdEnv import map, filter
+---
+
+(source_file
+  (import_declaration
+    (identifier)
+    (identifier)
+    (identifier)))
+
+==================
+Type Signature
+==================
+factorial :: Int -> Int
+---
+
+(source_file
+  (type_signature
+    name: (identifier)
+    (identifier)
+    (identifier)))
+
+==================
+Simple Function
+==================
+double x = x * 2
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    (identifier)
+    (identifier)
+    (operator)
+    (number)))
+
+==================
+Guarded Function
+==================
+abs x
+  | x < 0 = 0 - x
+  | otherwise = x
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    (identifier)
+    (guard_equation
+      (identifier)
+      (operator)
+      (number)
+      (number)
+      (operator)
+      (identifier))
+    (guard_equation
+      (identifier)
+      (identifier))))
+
+==================
+Function with Where
+==================
+f x = g x
+where
+  g y = y + 1
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    (identifier)
+    (application
+      (identifier)
+      (identifier)))
+  (function_declaration
+    name: (identifier)
+    (identifier)
+    (identifier)
+    (identifier)
+    (operator)
+    (number)))
+
+==================
+Function Application
+==================
+main xs = map f xs
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    (identifier)
+    (application
+      (application
+        (identifier)
+        (identifier))
+      (identifier))))
+
+==================
+Let Expression
+==================
+f x = let double n = n * 2 in double x
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    (identifier)
+    (let_expression
+      (function_declaration
+        name: (identifier)
+        (identifier)
+        (identifier)
+        (operator)
+        (number))
+      (application
+        (identifier)
+        (identifier)))))
+
+==================
+Case Expression
+==================
+len xs = case xs of
+  [] = 0
+  [h] = 1
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    (identifier)
+    (case_expression
+      (identifier)
+      (case_alternative
+        (application
+          (number)
+          (identifier))))
+    (operator)
+    (number)))
+
+==================
+Simple Binding
+==================
+x = 5
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    (number)))

@@ -1,0 +1,41 @@
+==================
+List Comprehension
+==================
+f xs = [x * 2 \\ x <- xs]
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    (identifier)
+    (list_comprehension
+      body: (identifier)
+      body: (operator)
+      body: (number)
+      (comprehension_qualifier
+        (generator
+          pattern: (identifier)
+          expression: (identifier))))))
+
+==================
+Comprehension with Let
+==================
+f xs = [y \\ x <- xs, let y = x + 1]
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    (identifier)
+    (list_comprehension
+      body: (identifier)
+      (comprehension_qualifier
+        (generator
+          pattern: (identifier)
+          expression: (identifier)))
+      (comprehension_qualifier
+        (let_qualifier
+          name: (identifier)
+          value: (identifier)
+          value: (operator)
+          value: (number))))))

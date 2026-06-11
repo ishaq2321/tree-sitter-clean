@@ -1,0 +1,41 @@
+==================
+Record Expression
+==================
+f = {name = "Test"}
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    (record_expression
+      name: (identifier)
+      value: (string))))
+
+==================
+Record Update
+==================
+f r = {r & name = "New"}
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    (identifier)
+    (record_update
+      record: (identifier)
+      name: (identifier)
+      value: (string))))
+
+==================
+Field Access
+==================
+f p = p.name
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    (identifier)
+    (field_access
+      (identifier)
+      (identifier))))

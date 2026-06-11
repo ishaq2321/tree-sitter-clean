@@ -1,0 +1,67 @@
+==================
+ADT Definition
+==================
+:: Maybe a = Just a | Nothing
+---
+
+(source_file
+  (type_definition
+    name: (identifier))
+  (function_declaration
+    name: (identifier)
+    (application
+      (identifier)
+      (identifier))
+    (operator)
+    (identifier)))
+
+==================
+ADT with Records
+==================
+:: Person = { name :: String, age :: Int }
+---
+
+(source_file
+  (type_definition
+    name: (identifier)
+    (record_definition
+      (record_field
+        (identifier)
+        (identifier))
+      (record_field
+        (identifier)
+        (identifier)))))
+
+==================
+Class Declaration
+==================
+class Show a where
+  show :: a -> String
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    (identifier)
+    (type_signature
+      name: (identifier)
+      (identifier)
+      (identifier))))
+
+==================
+Instance Declaration
+==================
+instance Show Int where
+  show x = toString x
+---
+
+(source_file
+  (instance_declaration
+    name: (identifier)
+    (identifier)
+    (function_declaration
+      name: (identifier)
+      (identifier)
+      (application
+        (identifier)
+        (identifier)))))

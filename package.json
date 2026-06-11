@@ -1,0 +1,58 @@
+{
+  "name": "tree-sitter-clean",
+  "version": "1.0.0",
+  "description": "Clean grammar for tree-sitter",
+  "repository": "https://github.com/tree-sitter/tree-sitter-clean",
+  "license": "MIT",
+  "author": {
+    "name": "Ishaq Muhammad",
+    "email": "ishaq2321@users.noreply.github.com"
+  },
+  "main": "bindings/node",
+  "types": "bindings/node",
+  "keywords": [
+    "clean",
+    "tree-sitter",
+    "parser",
+    "grammar"
+  ],
+  "files": [
+    "grammar.js",
+    "binding.gyp",
+    "prebuilds/**",
+    "bindings/node/*",
+    "queries/*",
+    "src/**"
+  ],
+  "tree-sitter": [
+    {
+      "scope": "source.clean",
+      "file-types": ["icl", "dcl", "abc"],
+      "highlights": "queries/highlights.scm",
+      "tags": "queries/tags.scm"
+    }
+  ],
+  "scripts": {
+    "build": "tree-sitter generate",
+    "build-wasm": "tree-sitter build --wasm",
+    "test": "tree-sitter test",
+    "install": "node-gyp-build",
+    "prebuildify": "prebuildify --napi --strip"
+  },
+  "dependencies": {
+    "node-addon-api": "^8.3.0",
+    "node-gyp-build": "^4.8.0"
+  },
+  "devDependencies": {
+    "prebuildify": "^6.0.0",
+    "tree-sitter-cli": "^0.24.0"
+  },
+  "peerDependencies": {
+    "tree-sitter": "^0.22.0"
+  },
+  "peerDependenciesMeta": {
+    "tree-sitter": {
+      "optional": true
+    }
+  }
+}

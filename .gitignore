@@ -1,0 +1,10 @@
+target/
+node_modules/
+prebuilds/
+*.node
+*.o
+*.a
+*.so
+*.dylib
+dist/
+.DS_Store
