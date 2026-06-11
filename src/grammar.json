@@ -737,6 +737,10 @@
           "name": "identifier"
         },
         {
+          "type": "SYMBOL",
+          "name": "lazy_pattern"
+        },
+        {
           "type": "SEQ",
           "members": [
             {
@@ -811,6 +815,19 @@
     "wildcard": {
       "type": "STRING",
       "value": "_"
+    },
+    "lazy_pattern": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "~"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_pattern"
+        }
+      ]
     },
     "_type_expression": {
       "type": "CHOICE",
@@ -1498,11 +1515,36 @@
           "value": "of"
         },
         {
+          "type": "SYMBOL",
+          "name": "_layout_start"
+        },
+        {
           "type": "REPEAT1",
           "content": {
-            "type": "SYMBOL",
-            "name": "case_alternative"
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "case_alternative"
+              },
+              {
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "SYMBOL",
+                    "name": "_layout_semicolon"
+                  },
+                  {
+                    "type": "BLANK"
+                  }
+                ]
+              }
+            ]
           }
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_layout_end"
         }
       ]
     },
@@ -1645,13 +1687,6 @@
     [
       "_expression",
       "let_before_expression"
-    ],
-    [
-      "case_expression"
-    ],
-    [
-      "_expression",
-      "case_alternative"
     ]
   ],
   "precedences": [],

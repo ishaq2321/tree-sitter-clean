@@ -9,6 +9,7 @@
 (number) @number
 (line_comment) @comment
 (block_comment) @comment
-(identifier) @variable
 ((identifier) @constructor
  (#match? @constructor "^[A-Z]"))
+((identifier) @variable
+ (#not-match? @variable "^[A-Z]"))

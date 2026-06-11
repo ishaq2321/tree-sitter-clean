@@ -13,8 +13,6 @@ module.exports = grammar({
     [$.data_constructor, $._type_atom],
     [$._expression, $.let_expression],
     [$._expression, $.let_before_expression],
-    [$.case_expression],
-    [$._expression, $.case_alternative],
   ],
 
   externals: ($) => [$._layout_semicolon, $._layout_start, $._layout_end],
@@ -111,12 +109,16 @@ module.exports = grammar({
       choice(
         $.wildcard,
         $.identifier,
+        $.lazy_pattern,
         seq("(", repeat1(choice($._pattern, ",", $.operator)), ")"),
         seq("[", repeat(seq($._pattern, optional(","))), "]"),
       ),
 
     // `_` wildcard — matches anything, binds nothing
     wildcard: ($) => "_",
+
+    // Lazy pattern: ~pattern — defers evaluation until the value is needed
+    lazy_pattern: ($) => seq("~", $._pattern),
 
     // ---- Type expressions ----
     // Clean type expressions: right-associative -> for functions,
@@ -178,11 +180,8 @@ module.exports = grammar({
     application: ($) => prec.left(10, seq($._expression, $._expression)),
 
     // Lambda: \pattern1 pattern2 ... -> expr  or  \pattern = expr
-    // prec.left keeps the lambda body greedy (consumes following operators)
     lambda_expression: ($) =>
       prec.left(seq("\\", repeat1($._pattern), choice("->", "="), $._expression)),
-
-    application: ($) => prec.left(10, seq($._expression, $._expression)),
 
     // Record field access: `record.field` or `record!field` (strict)
     field_access: ($) => prec.left(13, seq($._expression, choice(".", "!"), $.identifier)),
@@ -254,7 +253,7 @@ module.exports = grammar({
     let_before_expression: ($) =>
       seq(choice("#", "#!"), $._pattern, "=", $._expression, optional($.let_before_expression)),
 
-    case_expression: ($) => seq("case", $._expression, "of", repeat1($.case_alternative)),
+    case_expression: ($) => seq("case", $._expression, "of", $._layout_start, repeat1(seq($.case_alternative, optional($._layout_semicolon))), $._layout_end),
 
     case_alternative: ($) =>
       seq($._pattern, optional(seq("|", $._expression)), choice("->", "="), $._expression),

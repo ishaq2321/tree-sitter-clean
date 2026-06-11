@@ -155,11 +155,10 @@ len xs = case xs of
     (case_expression
       (identifier)
       (case_alternative
-        (application
-          (number)
-          (identifier))))
-    (operator)
-    (number)))
+        (number))
+      (case_alternative
+        (identifier)
+        (number)))))
 
 ==================
 Simple Binding
@@ -224,3 +223,16 @@ f x = case x of
       (case_alternative
         (wildcard)
         (number)))))
+
+==================
+Lazy Pattern
+==================
+f ~x = x
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    (lazy_pattern
+      (identifier))
+    (identifier)))
