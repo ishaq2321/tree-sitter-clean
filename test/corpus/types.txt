@@ -45,8 +45,9 @@ class Show a where
     (identifier)
     (type_signature
       name: (identifier)
-      (identifier)
-      (identifier))))
+      (type_fun
+        (identifier)
+        (identifier)))))
 
 ==================
 Instance Declaration

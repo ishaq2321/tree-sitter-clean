@@ -5,6 +5,7 @@ endif
 LANGUAGE_NAME := tree-sitter-clean
 HOMEPAGE_URL := https://github.com/tree-sitter/tree-sitter-clean
 VERSION := 1.0.0
+DESCRIPTION := Clean grammar for tree-sitter
 
 SRC_DIR := src
 TS ?= tree-sitter

@@ -39,8 +39,9 @@ factorial :: Int -> Int
 (source_file
   (type_signature
     name: (identifier)
-    (identifier)
-    (identifier)))
+    (type_fun
+      (identifier)
+      (identifier))))
 
 ==================
 Simple Function
@@ -93,14 +94,14 @@ where
     (identifier)
     (application
       (identifier)
-      (identifier)))
-  (function_declaration
-    name: (identifier)
-    (identifier)
-    (identifier)
-    (identifier)
-    (operator)
-    (number)))
+      (identifier))
+    (where_block
+      (function_declaration
+        name: (identifier)
+        (identifier)
+        (identifier)
+        (operator)
+        (number)))))
 
 ==================
 Function Application
@@ -170,3 +171,56 @@ x = 5
   (function_declaration
     name: (identifier)
     (number)))
+
+==================
+Lambda Expression
+==================
+f = \x -> x
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    (lambda_expression
+      (identifier)
+      (identifier))))
+
+==================
+Lambda Multi-arg
+==================
+f = \x y -> x + y
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    (lambda_expression
+      (identifier)
+      (identifier)
+      (identifier))
+    (operator)
+    (identifier)))
+
+==================
+Case with Guard
+==================
+f x = case x of
+  a | a > 0 -> a
+  _ -> 0
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    (identifier)
+    (case_expression
+      (identifier)
+      (case_alternative
+        (identifier)
+        (identifier)
+        (operator)
+        (number)
+        (identifier))
+      (case_alternative
+        (wildcard)
+        (number)))))

@@ -3,23 +3,17 @@ module.exports = grammar({
 
   extras: ($) => [/\s/, $.line_comment, $.block_comment],
 
+  word: ($) => $.identifier,
+
   conflicts: ($) => [
-    [$.application],
-    [$.field_access],
-    [$.list_comprehension, $._expression],
     [$._expression],
     [$._expression, $._pattern],
     [$.class_declaration],
     [$.instance_declaration],
-    [$.type_signature],
-    [$.data_constructor, $._type_expression],
-    [$._type_expression],
-    [$.where_block],
-    [$.with_block],
+    [$.data_constructor, $._type_atom],
     [$._expression, $.let_expression],
     [$._expression, $.let_before_expression],
     [$.case_expression],
-    [$.let_before_expression],
     [$._expression, $.case_alternative],
   ],
 
@@ -54,7 +48,10 @@ module.exports = grammar({
         ),
       ),
 
-    type_signature: ($) => seq(field("name", $.identifier), "::", repeat1($._type_expression)),
+    // Type signature: name :: type
+    // e.g. factorial :: Int -> Int
+    // e.g. compose :: (a -> b) (b -> c) -> a -> c
+    type_signature: ($) => seq(field("name", $.identifier), "::", $._type_expression),
 
     type_definition: ($) =>
       prec.left(
@@ -71,7 +68,7 @@ module.exports = grammar({
 
     data_constructors: ($) => prec.left(seq($.data_constructor, repeat(seq("|", $.data_constructor)))),
 
-    data_constructor: ($) => prec.left(seq($.identifier, repeat($._type_expression))),
+    data_constructor: ($) => prec.left(seq($.identifier, repeat($._type_atom))),
 
     record_definition: ($) => seq("{", repeat(seq($.record_field, optional(","))), "}"),
 
@@ -89,7 +86,7 @@ module.exports = grammar({
       seq(
         "instance",
         field("name", $.identifier),
-        repeat1($._type_expression),
+        repeat1($._type_atom),
         optional(seq("where", repeat($.function_declaration))),
       ),
 
@@ -103,16 +100,17 @@ module.exports = grammar({
 
     guard_equation: ($) => seq("|", $._expression, "=", $._expression),
 
-    where_block: ($) => seq("where", repeat1(choice($.type_signature, $.function_declaration))),
+    // where block: local definitions after a function body
+    // e.g. f x = g x where g y = y + 1
+    where_block: ($) => seq("where", $._layout_start, repeat1(seq(choice($.type_signature, $.function_declaration), optional($._layout_semicolon))), $._layout_end),
 
-    with_block: ($) => seq("with", repeat1(choice($.type_signature, $.function_declaration))),
+    // with block: similar to where but with different semantics in Clean
+    with_block: ($) => seq("with", $._layout_start, repeat1(seq(choice($.type_signature, $.function_declaration), optional($._layout_semicolon))), $._layout_end),
 
     _pattern: ($) =>
       choice(
         $.wildcard,
         $.identifier,
-        $.number,
-        $.string,
         seq("(", repeat1(choice($._pattern, ",", $.operator)), ")"),
         seq("[", repeat(seq($._pattern, optional(","))), "]"),
       ),
@@ -120,37 +118,69 @@ module.exports = grammar({
     // `_` wildcard — matches anything, binds nothing
     wildcard: ($) => "_",
 
+    // ---- Type expressions ----
+    // Clean type expressions: right-associative -> for functions,
+    // left-associative juxtaposition for type application.
+    //
+    // Examples:
+    //   Int                     → _type_atom
+    //   a -> b                  → type_fun(a, ->, b)
+    //   a -> b -> c             → type_fun(a, ->, type_fun(b, ->, c))
+    //   Maybe a                 → type_application(Maybe, a)
+    //   Maybe a -> b            → type_fun(type_application(Maybe, a), ->, b)
+    //   (a, b) -> c             → type_fun((a, b), ->, c)
+    //   [Int]                   → _type_atom([Int])
+    //   *World                  → _type_atom(*World)
+
     _type_expression: ($) =>
-      prec.left(
-        choice(
-          $.identifier,
-          "->",
-          "*",
-          "!",
-          seq("(", repeat1(choice($._type_expression, ",", "->", "*")), ")"),
-          seq("[", $._type_expression, "]"),
-        ),
+      choice(
+        $.type_fun,
+        $._type_application,
       ),
+
+    type_fun: ($) => prec.right(1, seq($._type_expression, "->", $._type_expression)),
+
+    _type_application: ($) =>
+      prec.left(2, seq($._type_atom, repeat($._type_atom))),
+
+    _type_atom: ($) =>
+      choice(
+        $.identifier,
+        "*",
+        "!",
+        seq("(", $._type_expression, repeat(seq(",", $._type_expression)), ")"),
+        seq("[", $._type_expression, "]"),
+      ),
+
+    // ---- Term expressions ----
 
     _expression: ($) =>
       prec.left(
         choice(
+          seq($._expression, $.operator, $._expression),
+          $.application,
+          $.lambda_expression,
           $.field_access,
           $.list_comprehension,
           $.record_expression,
           $.record_update,
-          $.identifier,
-          $.number,
-          $.string,
           $.let_expression,
           $.let_before_expression,
           $.case_expression,
+          $.identifier,
+          $.number,
+          $.string,
           seq("(", repeat(choice($._expression, $.operator, ",")), ")"),
           seq("[", repeat(seq($._expression, optional(","))), "]"),
-          seq($._expression, $.operator, $._expression),
-          $.application,
         ),
       ),
+
+    application: ($) => prec.left(10, seq($._expression, $._expression)),
+
+    // Lambda: \pattern1 pattern2 ... -> expr  or  \pattern = expr
+    // prec.left keeps the lambda body greedy (consumes following operators)
+    lambda_expression: ($) =>
+      prec.left(seq("\\", repeat1($._pattern), choice("->", "="), $._expression)),
 
     application: ($) => prec.left(10, seq($._expression, $._expression)),
 
@@ -226,7 +256,8 @@ module.exports = grammar({
 
     case_expression: ($) => seq("case", $._expression, "of", repeat1($.case_alternative)),
 
-    case_alternative: ($) => seq($._pattern, choice("->", "="), $._expression),
+    case_alternative: ($) =>
+      seq($._pattern, optional(seq("|", $._expression)), choice("->", "="), $._expression),
 
     identifier: ($) => /[a-zA-Z_][a-zA-Z0-9_]*/,
     operator: ($) => /[!@$%^&*+\-=\\|<>\/?~.]+/,

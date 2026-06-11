@@ -89,6 +89,12 @@ bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer, cons
         uint16_t current_indent = scanner->indent_length_stack[scanner->indent_length_stack_size - 1];
 
         if (indent_length == current_indent && valid_symbols[LAYOUT_SEMICOLON]) {
+            // Don't break before keywords that continue the current declaration:
+            // 'w' → where / with blocks
+            // '|' → guard equations (handled in grammar, but be safe)
+            if (lexer->lookahead == 'w') {
+                return false;
+            }
             lexer->result_symbol = LAYOUT_SEMICOLON;
             return true;
         }
