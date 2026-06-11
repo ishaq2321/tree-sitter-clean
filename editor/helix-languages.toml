@@ -1,0 +1,14 @@
+# ==== ADD TO languages.toml (alphabetical order) ====
+
+[[language]]
+name = "clean"
+scope = "source.clean"
+injection-regex = "clean"
+file-types = ["icl", "dcl"]
+comment-token = "//"
+block-comment-tokens = { start = "/*", end = "*/" }
+indent = { tab-width = 4, unit = "    " }
+
+[[grammar]]
+name = "clean"
+source = { git = "https://github.com/ishaq2321/tree-sitter-clean", rev = "260af40" }
