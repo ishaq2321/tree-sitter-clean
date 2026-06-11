@@ -2,33 +2,10 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 jobs:
   test:
-    name: Test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      
-      - name: Setup Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-      
-      - name: Install tree-sitter CLI
-        run: cargo install tree-sitter-cli --version 0.24.0
-      
-      - name: Generate parser
-        run: tree-sitter generate
-      
-      - name: Run corpus tests
-        run: tree-sitter test
-      
-      - name: Verify Rust bindings
-        run: cargo test --manifest-path Cargo.toml
+    uses: tree-sitter/workflows/.github/workflows/ci.yml@main

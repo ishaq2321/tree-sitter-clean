@@ -6,12 +6,11 @@
       "scope": "source.clean",
       "file-types": [
         "icl",
-        "dcl",
-        "abc"
+        "dcl"
       ],
       "highlights": "queries/highlights.scm",
       "tags": "queries/tags.scm",
-      "injection-regex": "^(icl|dcl|abc)$"
+      "injection-regex": "^(icl|dcl)$"
     }
   ],
   "metadata": {

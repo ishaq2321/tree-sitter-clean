@@ -2,7 +2,10 @@
   "name": "tree-sitter-clean",
   "version": "1.0.0",
   "description": "Clean grammar for tree-sitter",
-  "repository": "https://github.com/ishaq2321/tree-sitter-clean",
+    "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ishaq2321/tree-sitter-clean.git"
+  },
   "license": "MIT",
   "author": {
     "name": "Ishaq Muhammad",
@@ -27,7 +30,7 @@
   "tree-sitter": [
     {
       "scope": "source.clean",
-      "file-types": ["icl", "dcl", "abc"],
+      "file-types": ["icl", "dcl"],
       "highlights": "queries/highlights.scm",
       "tags": "queries/tags.scm"
     }

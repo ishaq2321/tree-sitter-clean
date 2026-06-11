@@ -236,3 +236,110 @@ f ~x = x
     (lazy_pattern
       (identifier))
     (identifier)))
+
+==================
+String Literal
+==================
+name = "Ishaq"
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    (string)))
+
+==================
+Wildcard Pattern
+==================
+f _ = 0
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    (wildcard)
+    (number)))
+
+==================
+With Block
+==================
+f x = g x with
+  g y = y + 1
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    (identifier)
+    (application
+      (identifier)
+      (identifier))
+    (with_block
+      (function_declaration
+        name: (identifier)
+        (identifier)
+        (identifier)
+        (operator)
+        (number)))))
+
+==================
+Let-Before Expression
+==================
+f x = # y = x + 1
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    (identifier)
+    (let_before_expression
+      (identifier)
+      (identifier))
+    (operator)
+    (number)))
+
+==================
+Let-Before Strict
+==================
+f x = #! y = x + 1
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    (identifier)
+    (let_before_expression
+      (identifier)
+      (identifier))
+    (operator)
+    (number)))
+
+==================
+Implementation Module
+==================
+implementation module Internal
+---
+
+(source_file
+  (module_declaration
+    (identifier)))
+
+==================
+Definition Module
+==================
+definition module Types
+---
+
+(source_file
+  (module_declaration
+    (identifier)))
+
+==================
+System Module
+==================
+system module Runtime
+---
+
+(source_file
+  (module_declaration
+    (identifier)))
