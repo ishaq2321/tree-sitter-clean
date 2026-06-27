@@ -4,6 +4,10 @@ from setuptools.command.build import build
 from setuptools.command.build_ext import build_ext
 from wheel.bdist_wheel import bdist_wheel
 
+HERE = path.abspath(path.dirname(__file__))
+with open(path.join(HERE, "README.md"), encoding="utf-8") as f:
+    LONG_DESCRIPTION = f.read()
+
 class Build(build):
     def run(self):
         if path.isdir("queries"):
@@ -29,6 +33,28 @@ class BdistWheel(bdist_wheel):
         return python, abi, platform
 
 setup(
+    name="tree-sitter-clean",
+    version="1.0.0",
+    description="Clean grammar for tree-sitter",
+    long_description=LONG_DESCRIPTION,
+    long_description_content_type="text/markdown",
+    author="Ishaq Muhammad",
+    author_email="ishaq2321@users.noreply.github.com",
+    url="https://github.com/ishaq2321/tree-sitter-clean",
+    license="MIT",
+    classifiers=[
+        "Development Status :: 5 - Production/Stable",
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: MIT License",
+        "Programming Language :: C",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Topic :: Software Development :: Compilers",
+        "Topic :: Text Processing :: Linguistic",
+    ],
+    python_requires=">=3.10",
     packages=["tree_sitter_clean"],
     package_dir={"": "bindings/python"},
     package_data={
