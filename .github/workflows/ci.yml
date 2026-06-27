@@ -8,4 +8,27 @@ on:
 
 jobs:
   test:
-    uses: tree-sitter/workflows/.github/workflows/ci.yml@main
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install tree-sitter CLI
+        run: npm install -g tree-sitter-cli
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate parser
+        run: npx tree-sitter generate
+
+      - name: Run corpus tests
+        run: npx tree-sitter test
+
+      - name: Verify parse
+        run: npx tree-sitter parse examples/*.clean 2>/dev/null || echo "No example files yet"

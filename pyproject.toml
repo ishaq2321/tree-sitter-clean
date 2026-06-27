@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=40.8.0,<75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tree-sitter-clean"
+version = "1.0.0"
+description = "Clean grammar for tree-sitter"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Ishaq Muhammad", email = "ishaq2321@users.noreply.github.com"}
+]
+urls = {repository = "https://github.com/ishaq2321/tree-sitter-clean"}
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: C",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Compilers",
+    "Topic :: Text Processing :: Linguistic",
+]
+requires-python = ">=3.10"

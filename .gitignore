@@ -8,3 +8,7 @@ prebuilds/
 *.dylib
 dist/
 .DS_Store
+bindings/python/tree_sitter_clean.egg-info/
+dist/
+build/
+*.egg-info/
