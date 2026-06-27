@@ -3,7 +3,6 @@
 [![CI][ci]](https://github.com/ishaq2321/tree-sitter-clean/actions/workflows/ci.yml)
 [![discord][discord]](https://discord.gg/w7nTvsVJhm)
 [![matrix][matrix]](https://matrix.to/#/#tree-sitter-chat:matrix.org)
-[![crates][crates]](https://crates.io/crates/tree-sitter-clean)
 [![npm][npm]](https://www.npmjs.com/package/tree-sitter-clean)
 [![pypi][pypi]](https://pypi.org/project/tree-sitter-clean)
 
@@ -62,5 +61,4 @@ import tree_sitter_clean
 [discord]: https://img.shields.io/discord/1063097320771698699?logo=discord&label=discord
 [matrix]: https://img.shields.io/matrix/tree-sitter-chat%3Amatrix.org?logo=matrix&label=matrix
 [npm]: https://img.shields.io/npm/v/tree-sitter-clean?logo=npm
-[crates]: https://img.shields.io/crates/v/tree-sitter-clean?logo=rust
 [pypi]: https://img.shields.io/pypi/v/tree-sitter-clean?logo=pypi&logoColor=ffd242
