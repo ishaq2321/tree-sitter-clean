@@ -14,12 +14,12 @@
     }
   ],
   "metadata": {
-    "version": "1.0.0",
+    "version": "1.1.0",
     "license": "MIT",
     "description": "Clean grammar for tree-sitter",
     "authors": [
       {
-        "name": "Ishaq Muhammad",
+        "name": "Muhammad Ishaq Khan",
         "email": "ishaq2321@users.noreply.github.com",
         "url": "https://github.com/ishaq2321"
       }

@@ -1,10 +1,10 @@
 [package]
 name = "tree-sitter-clean"
 description = "Clean grammar for tree-sitter"
-version = "1.0.0"
+version = "1.1.0"
 license = "MIT"
 readme = "README.md"
-authors = ["Ishaq Muhammad <ishaq2321@users.noreply.github.com>"]
+authors = ["Muhammad Ishaq Khan <ishaq2321@users.noreply.github.com>"]
 categories = ["parsing", "text-editors"]
 keywords = ["clean", "tree-sitter", "parser", "grammar"]
 repository = "https://github.com/ishaq2321/tree-sitter-clean"

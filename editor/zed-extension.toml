@@ -2,7 +2,7 @@
 name = "Clean"
 description = "Clean programming language support for Zed"
 version = "1.0.0"
-authors = ["Ishaq Muhammad <ishaq2321@users.noreply.github.com>"]
+authors = ["Muhammad Ishaq Khan <ishaq2321@users.noreply.github.com>"]
 repository = "https://github.com/ishaq2321/tree-sitter-clean"
 
 [language.clean]

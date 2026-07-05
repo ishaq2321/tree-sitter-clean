@@ -1,6 +1,6 @@
 {
   "name": "tree-sitter-clean",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Clean grammar for tree-sitter",
     "repository": {
     "type": "git",
@@ -8,7 +8,7 @@
   },
   "license": "MIT",
   "author": {
-    "name": "Ishaq Muhammad",
+    "name": "Muhammad Ishaq Khan",
     "email": "ishaq2321@users.noreply.github.com"
   },
   "main": "bindings/node",
