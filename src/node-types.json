@@ -379,6 +379,10 @@
         {
           "type": "comprehension_qualifier",
           "named": true
+        },
+        {
+          "type": "comprehension_sep",
+          "named": true
         }
       ]
     }
@@ -490,7 +494,7 @@
           }
         ]
       },
-      "guard": {
+      "condition": {
         "multiple": false,
         "required": false,
         "types": [
@@ -510,6 +514,16 @@
           }
         ]
       }
+    },
+    "children": {
+      "multiple": false,
+      "required": false,
+      "types": [
+        {
+          "type": "arrow",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -1497,6 +1511,16 @@
           }
         ]
       }
+    },
+    "children": {
+      "multiple": false,
+      "required": false,
+      "types": [
+        {
+          "type": "arrow",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -1637,6 +1661,10 @@
       "types": [
         {
           "type": "comprehension_qualifier",
+          "named": true
+        },
+        {
+          "type": "comprehension_sep",
           "named": true
         }
       ]
@@ -2326,6 +2354,10 @@
         {
           "type": "_type",
           "named": true
+        },
+        {
+          "type": "arrow",
+          "named": true
         }
       ]
     }
@@ -2557,10 +2589,6 @@
     "named": false
   },
   {
-    "type": "->",
-    "named": false
-  },
-  {
     "type": ".",
     "named": false
   },
@@ -2605,10 +2633,6 @@
     "named": false
   },
   {
-    "type": "\\\\",
-    "named": false
-  },
-  {
     "type": "]",
     "named": false
   },
@@ -2619,6 +2643,10 @@
   {
     "type": "apply",
     "named": false
+  },
+  {
+    "type": "arrow",
+    "named": true
   },
   {
     "type": "block_comment",
@@ -2640,6 +2668,10 @@
   {
     "type": "code",
     "named": false
+  },
+  {
+    "type": "comprehension_sep",
+    "named": true
   },
   {
     "type": "constructor",

@@ -62,8 +62,9 @@
 
 ; Punctuation
 "=" @operator
-"->" @operator
+(arrow) @operator
 "," @punctuation.delimiter
 "." @punctuation.delimiter
 "|" @operator
 "::" @operator
+(comprehension_sep) @operator

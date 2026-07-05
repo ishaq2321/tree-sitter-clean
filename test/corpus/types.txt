@@ -56,6 +56,7 @@ class Show a where
         type: (type_function
           (type_variable
             (identifier))
+          (arrow)
           (constructor))))))
 
 ==================

@@ -8,22 +8,21 @@ f xs = [x * 2 \\ x <- xs]
   (function_declaration
     name: (identifier)
     pattern: (identifier)
-    body: (list_expression
-      (binary_expression
-        (binary_expression
-          (binary_expression
+    body: (list_comprehension
+      body: (binary_expression
+        (identifier)
+        operator: (operator_mul)
+        (number
+          (integer)))
+      (comprehension_sep)
+      (comprehension_qualifier
+        (guard
+          condition: (binary_expression
             (identifier)
-            operator: (operator_mul)
-            (number
-              (integer)))
-          operator: (operator_mul)
-          (unary_expression
-            operator: (operator)
-            (identifier)))
-        operator: (operator_compare)
-        (unary_expression
-          operator: (operator)
-          (identifier))))))
+            operator: (operator_compare)
+            (unary_expression
+              operator: (operator)
+              (identifier))))))))
 
 ==================
 Comprehension with Let
@@ -35,24 +34,22 @@ f xs = [y \\ x <- xs, let y = x + 1]
   (function_declaration
     name: (identifier)
     pattern: (identifier)
-    body: (list_expression
-      (binary_expression
-        (binary_expression
-          (identifier)
-          operator: (operator_mul)
-          (unary_expression
-            operator: (operator)
-            (identifier)))
-        operator: (operator_compare)
-        (unary_expression
-          operator: (operator)
-          (identifier)))
-      (ERROR
-        (local_binding
-          (function_declaration
-            name: (identifier)
-            body: (binary_expression
-              (identifier)
-              operator: (operator_add)
-              (number
-                (integer)))))))))
+    body: (list_comprehension
+      body: (identifier)
+      (comprehension_sep)
+      (comprehension_qualifier
+        (guard
+          condition: (binary_expression
+            (identifier)
+            operator: (operator_compare)
+            (unary_expression
+              operator: (operator)
+              (identifier)))))
+      (comprehension_qualifier
+        (let_qualifier
+          name: (identifier)
+          value: (binary_expression
+            (identifier)
+            operator: (operator_add)
+            (number
+              (integer))))))))

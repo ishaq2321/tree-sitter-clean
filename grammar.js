@@ -89,11 +89,13 @@ module.exports = grammar({
     // where_block repeat1 ambiguity
     [$.where_block],
     [$.with_block],
-    [$.case_expression],
     [$.macro_definition, $.function_declaration, $.let_qualifier],
     [$.function_declaration, $.let_qualifier],
     [$.type_signature],
+    // empty list [] in pattern vs expression context
     [$.list_pattern, $.list_expression],
+    // case_alternative with guard: body expression consuming `->` vs arrow separator
+    [$.binary_expression, $.case_alternative],
   ],
 
   rules: {
@@ -361,7 +363,7 @@ module.exports = grammar({
       ),
 
     type_function: ($) =>
-      prec.right(PREC.CONSTRUCTOR, seq($._type, "->", $._type)),
+      prec.right(PREC.CONSTRUCTOR, seq($._type, $.arrow, $._type)),
 
     type_application: ($) =>
       prec.left(
@@ -640,21 +642,24 @@ module.exports = grammar({
 
     _expression: ($) =>
       choice(
+        // Keyword-triggered expressions first so they aren't swallowed
+        // by the left-recursive binary_expression chain.
+        $.case_expression,
+        $.if_expression,
+        $.let_expression,
+        $.let_before_expression,
+        $.lambda_expression,
+        $.list_comprehension,
+        $.array_comprehension,
+        // Then the Pratt ladder + compound forms
         $.binary_expression,
         $.unary_expression,
         $.application,
         $.field_access,
         $.index_access,
-        $.lambda_expression,
-        $.let_expression,
-        $.let_before_expression,
-        $.case_expression,
-        $.if_expression,
         $.list_expression,
-        $.list_comprehension,
         $.tuple_expression,
         $.array_expression,
-        $.array_comprehension,
         $.record_expression,
         $.record_update,
         $.range_expression,
@@ -729,7 +734,7 @@ module.exports = grammar({
     lambda_expression: ($) =>
       prec.left(
         PREC.LAMBDA,
-        seq("\\", repeat1(field("parameter", $._pattern)), choice("->", "="), field("body", $._expression)),
+        seq("\\", repeat1(field("parameter", $._pattern)), choice($.arrow, "="), field("body", $._expression)),
       ),
 
     // `let bindings in expr`
@@ -758,21 +763,31 @@ module.exports = grammar({
       ),
 
     case_expression: ($) =>
-      seq(
-        "case",
-        field("subject", $._expression),
-        "of",
-        optional($._layout_start),
-        repeat1(seq($.case_alternative, optional($._layout_semicolon))),
-        optional($._layout_end),
+      prec.left(
+        seq(
+          "case",
+          field("subject", $._expression),
+          "of",
+          repeat1($.case_alternative),
+        ),
       ),
 
     case_alternative: ($) =>
-      seq(
-        field("pattern", $._pattern),
-        optional(seq("|", field("guard", $._expression))),
-        choice("->", "="),
-        field("body", $._expression),
+      choice(
+        // with guard: pat | cond -> body
+        prec(2, seq(
+          field("pattern", $._pattern),
+          "|",
+          field("condition", $._expression),
+          $.arrow,
+          field("body", $._expression),
+        )),
+        // without guard: pat -> body  or  pat = body
+        prec(1, seq(
+          field("pattern", $._pattern),
+          choice($.arrow, "="),
+          field("body", $._expression),
+        )),
       ),
 
     // `if c then a else b`
@@ -841,7 +856,7 @@ module.exports = grammar({
         "{",
         optional(choice("!", "#")),
         field("body", $._expression),
-        "\\\\",
+        $.comprehension_sep,
         repeat1(seq($.comprehension_qualifier, optional(","))),
         "}",
       ),
@@ -851,7 +866,7 @@ module.exports = grammar({
       seq(
         "[",
         field("body", $._expression),
-        "\\\\",
+        $.comprehension_sep,
         repeat1(seq($.comprehension_qualifier, optional(","))),
         "]",
       ),
@@ -985,6 +1000,15 @@ module.exports = grammar({
     //     with higher lexical precedence, so they win over the catch-all.
     //   - The well-known operators get their own per-tier tokens (see below);
     //     `operator` is the catch-all for user-defined operators.
+    // Comprehension separator — must be a dedicated high-precedence token
+    // to beat `operator_mul` (`\`) + `operator_mul` (`\`) tokenization.
+    comprehension_sep: ($) => token(prec(10, "\\\\")),
+
+    // Arrow — must be a dedicated high-precedence token to beat
+    // `operator_add` (`-`) + `operator_compare` (`>`) tokenization.
+    arrow: ($) => token(prec(10, "->")),
+
+    // Generic fallback operator
     operator: ($) => token(prec(1, /[~%^*+\-\\<>\/?]+/)),
 
     range_operator: ($) => token(prec(2, "..")),

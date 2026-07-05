@@ -45,6 +45,7 @@ factorial :: Int -> Int
       (identifier))
     type: (type_function
       (constructor)
+      (arrow)
       (constructor))))
 
 ==================
@@ -173,13 +174,12 @@ len xs = case xs of
       (case_alternative
         pattern: (list_pattern)
         body: (number
-          (integer)))))
-  (ERROR)
-  (function_declaration
-    name: (identifier)
-    (ERROR)
-    body: (number
-      (integer))))
+          (integer)))
+      (case_alternative
+        pattern: (list_pattern
+          (identifier))
+        body: (number
+          (integer))))))
 
 ==================
 Simple Binding
@@ -243,29 +243,25 @@ f x = case x of
 ---
 
 (source_file
-  (ERROR
-    (identifier)
+  (function_declaration
+    name: (identifier)
     pattern: (identifier)
-    (identifier)
-    (identifier)
-    (binary_expression
-      (identifier)
-      operator: (operator_compare)
-      (binary_expression
-        (binary_expression
+    body: (case_expression
+      subject: (identifier)
+      (case_alternative
+        pattern: (identifier)
+        condition: (binary_expression
+          (identifier)
+          operator: (operator_compare)
           (number
-            (integer))
-          operator: (operator_add)
-          (unary_expression
-            operator: (operator)
-            (application
-              function: (identifier)
-              argument: (identifier))))
-        operator: (operator_add)
-        (unary_expression
-          operator: (operator)
-          (number
-            (integer)))))))
+            (integer)))
+        (arrow)
+        body: (identifier))
+      (case_alternative
+        pattern: (wildcard)
+        (arrow)
+        body: (number
+          (integer))))))
 
 ==================
 Lazy Pattern
