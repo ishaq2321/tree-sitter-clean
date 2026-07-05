@@ -7,7 +7,7 @@ f = {name = "Test"}
 (source_file
   (function_declaration
     name: (identifier)
-    (record_expression
+    body: (record_expression
       name: (identifier)
       value: (string))))
 
@@ -20,10 +20,11 @@ f r = {r & name = "New"}
 (source_file
   (function_declaration
     name: (identifier)
-    (identifier)
-    (record_update
+    pattern: (identifier)
+    body: (record_update
       record: (identifier)
-      name: (identifier)
+      field: (update_field
+        (identifier))
       value: (string))))
 
 ==================
@@ -35,7 +36,7 @@ f p = p.name
 (source_file
   (function_declaration
     name: (identifier)
-    (identifier)
-    (field_access
-      (identifier)
-      (identifier))))
+    pattern: (identifier)
+    body: (field_access
+      record: (identifier)
+      field: (identifier))))

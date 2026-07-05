@@ -13,27 +13,36 @@
 "implementation" @keyword
 "definition" @keyword
 "system" @keyword
+"infix" @keyword
+"infixl" @keyword
+"infixr" @keyword
+"generic" @keyword
+"derive" @keyword
+"if" @keyword
 
 ; Module and import names
-(module_declaration (identifier) @module)
-(import_declaration (identifier) @module)
+(module_identifier) @module
+(module_name (module_identifier) @module)
 
 ; Types and constructors
-(type_signature (identifier) @type)
-(type_definition (identifier) @type)
-(class_declaration (identifier) @type)
-(instance_declaration (identifier) @type)
-((identifier) @constructor
- (#match? @constructor "^[A-Z]"))
+(type_signature name: (signature_name (identifier) @type))
+(type_definition name: (constructor) @type)
+(class_declaration name: (class_name (constructor) @type))
+(class_name (constructor) @type)
+(constructor) @constructor
 
-; Functions and variables
-(function_declaration (identifier) @function)
-((identifier) @variable
- (#not-match? @variable "^[A-Z]"))
+; Functions
+(function_declaration name: (identifier) @function)
+(macro_definition name: (identifier) @function)
+
+; Variables
+(identifier) @variable
 
 ; Literals
 (string) @string
 (number) @number
+(char) @string
+(integer) @number
 
 ; Comments
 (line_comment) @comment
@@ -41,6 +50,12 @@
 
 ; Operators
 (operator) @operator
+(operator_add) @operator
+(operator_mul) @operator
+(operator_compare) @operator
+(operator_cons) @operator
+(operator_and) @operator
+(operator_or) @operator
 
 ; Patterns
 (wildcard) @keyword

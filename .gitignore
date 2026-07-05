@@ -12,3 +12,4 @@ bindings/python/tree_sitter_clean.egg-info/
 dist/
 build/
 *.egg-info/
+package-lock.json

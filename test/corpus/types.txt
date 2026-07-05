@@ -6,14 +6,17 @@ ADT Definition
 
 (source_file
   (type_definition
-    name: (identifier))
-  (function_declaration
-    name: (identifier)
-    (application
-      (identifier)
+    name: (constructor)
+    parameter: (type_variable
       (identifier))
-    (operator)
-    (identifier)))
+    body: (type_definition_body
+      rhs: (data_constructors
+        (data_constructor
+          name: (constructor)
+          argument: (type_variable
+            (identifier)))
+        (data_constructor
+          name: (constructor))))))
 
 ==================
 ADT with Records
@@ -23,14 +26,15 @@ ADT with Records
 
 (source_file
   (type_definition
-    name: (identifier)
-    (record_definition
-      (record_field
-        (identifier)
-        (identifier))
-      (record_field
-        (identifier)
-        (identifier)))))
+    name: (constructor)
+    body: (type_definition_body
+      rhs: (record_definition
+        (record_field
+          name: (identifier)
+          type: (constructor))
+        (record_field
+          name: (identifier)
+          type: (constructor))))))
 
 ==================
 Class Declaration
@@ -41,13 +45,18 @@ class Show a where
 
 (source_file
   (class_declaration
-    name: (identifier)
-    (identifier)
-    (type_signature
-      name: (identifier)
-      (type_fun
-        (identifier)
-        (identifier)))))
+    name: (class_name
+      (constructor))
+    parameter: (type_variable
+      (identifier))
+    (class_member
+      (type_signature
+        name: (signature_name
+          (identifier))
+        type: (type_function
+          (type_variable
+            (identifier))
+          (constructor))))))
 
 ==================
 Instance Declaration
@@ -58,11 +67,12 @@ instance Show Int where
 
 (source_file
   (instance_declaration
-    name: (identifier)
-    (identifier)
+    name: (instance_class
+      (constructor))
+    argument: (constructor)
     (function_declaration
       name: (identifier)
-      (identifier)
-      (application
-        (identifier)
-        (identifier)))))
+      pattern: (identifier)
+      body: (application
+        function: (identifier)
+        argument: (identifier)))))

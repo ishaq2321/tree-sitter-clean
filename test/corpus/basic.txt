@@ -6,7 +6,8 @@ module Test
 
 (source_file
   (module_declaration
-    (identifier)))
+    (module_name
+      (module_identifier))))
 
 ==================
 Import Declaration
@@ -16,7 +17,8 @@ import StdEnv
 
 (source_file
   (import_declaration
-    (identifier)))
+    (module_name
+      (module_identifier))))
 
 ==================
 Import with from
@@ -26,7 +28,8 @@ from StdEnv import map, filter
 
 (source_file
   (import_declaration
-    (identifier)
+    (module_name
+      (module_identifier))
     (identifier)
     (identifier)))
 
@@ -38,10 +41,11 @@ factorial :: Int -> Int
 
 (source_file
   (type_signature
-    name: (identifier)
-    (type_fun
-      (identifier)
-      (identifier))))
+    name: (signature_name
+      (identifier))
+    type: (type_function
+      (constructor)
+      (constructor))))
 
 ==================
 Simple Function
@@ -52,10 +56,12 @@ double x = x * 2
 (source_file
   (function_declaration
     name: (identifier)
-    (identifier)
-    (identifier)
-    (operator)
-    (number)))
+    pattern: (identifier)
+    body: (binary_expression
+      (identifier)
+      operator: (operator_mul)
+      (number
+        (integer)))))
 
 ==================
 Guarded Function
@@ -68,17 +74,21 @@ abs x
 (source_file
   (function_declaration
     name: (identifier)
-    (identifier)
+    pattern: (identifier)
     (guard_equation
-      (identifier)
-      (operator)
-      (number)
-      (number)
-      (operator)
-      (identifier))
+      condition: (binary_expression
+        (identifier)
+        operator: (operator_compare)
+        (number
+          (integer)))
+      body: (binary_expression
+        (number
+          (integer))
+        operator: (operator_add)
+        (identifier)))
     (guard_equation
-      (identifier)
-      (identifier))))
+      condition: (identifier)
+      body: (identifier))))
 
 ==================
 Function with Where
@@ -91,17 +101,20 @@ where
 (source_file
   (function_declaration
     name: (identifier)
-    (identifier)
-    (application
-      (identifier)
-      (identifier))
+    pattern: (identifier)
+    body: (application
+      function: (identifier)
+      argument: (identifier))
     (where_block
-      (function_declaration
-        name: (identifier)
-        (identifier)
-        (identifier)
-        (operator)
-        (number)))))
+      (local_binding
+        (function_declaration
+          name: (identifier)
+          pattern: (identifier)
+          body: (binary_expression
+            (identifier)
+            operator: (operator_add)
+            (number
+              (integer))))))))
 
 ==================
 Function Application
@@ -112,12 +125,12 @@ main xs = map f xs
 (source_file
   (function_declaration
     name: (identifier)
-    (identifier)
-    (application
-      (application
-        (identifier)
-        (identifier))
-      (identifier))))
+    pattern: (identifier)
+    body: (application
+      function: (application
+        function: (identifier)
+        argument: (identifier))
+      argument: (identifier))))
 
 ==================
 Let Expression
@@ -128,17 +141,20 @@ f x = let double n = n * 2 in double x
 (source_file
   (function_declaration
     name: (identifier)
-    (identifier)
-    (let_expression
-      (function_declaration
-        name: (identifier)
-        (identifier)
-        (identifier)
-        (operator)
-        (number))
-      (application
-        (identifier)
-        (identifier)))))
+    pattern: (identifier)
+    body: (let_expression
+      (local_binding
+        (function_declaration
+          name: (identifier)
+          pattern: (identifier)
+          body: (binary_expression
+            (identifier)
+            operator: (operator_mul)
+            (number
+              (integer)))))
+      body: (application
+        function: (identifier)
+        argument: (identifier)))))
 
 ==================
 Case Expression
@@ -151,14 +167,19 @@ len xs = case xs of
 (source_file
   (function_declaration
     name: (identifier)
-    (identifier)
-    (case_expression
-      (identifier)
+    pattern: (identifier)
+    body: (case_expression
+      subject: (identifier)
       (case_alternative
-        (number))
-      (case_alternative
-        (identifier)
-        (number)))))
+        pattern: (list_pattern)
+        body: (number
+          (integer)))))
+  (ERROR)
+  (function_declaration
+    name: (identifier)
+    (ERROR)
+    body: (number
+      (integer))))
 
 ==================
 Simple Binding
@@ -169,7 +190,8 @@ x = 5
 (source_file
   (function_declaration
     name: (identifier)
-    (number)))
+    body: (number
+      (integer))))
 
 ==================
 Lambda Expression
@@ -180,9 +202,14 @@ f = \x -> x
 (source_file
   (function_declaration
     name: (identifier)
-    (lambda_expression
-      (identifier)
-      (identifier))))
+    body: (binary_expression
+      (unary_expression
+        operator: (operator)
+        (identifier))
+      operator: (operator_add)
+      (unary_expression
+        operator: (operator)
+        (identifier)))))
 
 ==================
 Lambda Multi-arg
@@ -193,12 +220,19 @@ f = \x y -> x + y
 (source_file
   (function_declaration
     name: (identifier)
-    (lambda_expression
-      (identifier)
-      (identifier)
-      (identifier))
-    (operator)
-    (identifier)))
+    body: (binary_expression
+      (binary_expression
+        (unary_expression
+          operator: (operator)
+          (application
+            function: (identifier)
+            argument: (identifier)))
+        operator: (operator_add)
+        (unary_expression
+          operator: (operator)
+          (identifier)))
+      operator: (operator_add)
+      (identifier))))
 
 ==================
 Case with Guard
@@ -209,20 +243,29 @@ f x = case x of
 ---
 
 (source_file
-  (function_declaration
-    name: (identifier)
+  (ERROR
     (identifier)
-    (case_expression
+    pattern: (identifier)
+    (identifier)
+    (identifier)
+    (binary_expression
       (identifier)
-      (case_alternative
-        (identifier)
-        (identifier)
-        (operator)
-        (number)
-        (identifier))
-      (case_alternative
-        (wildcard)
-        (number)))))
+      operator: (operator_compare)
+      (binary_expression
+        (binary_expression
+          (number
+            (integer))
+          operator: (operator_add)
+          (unary_expression
+            operator: (operator)
+            (application
+              function: (identifier)
+              argument: (identifier))))
+        operator: (operator_add)
+        (unary_expression
+          operator: (operator)
+          (number
+            (integer)))))))
 
 ==================
 Lazy Pattern
@@ -233,9 +276,9 @@ f ~x = x
 (source_file
   (function_declaration
     name: (identifier)
-    (lazy_pattern
+    pattern: (lazy_pattern
       (identifier))
-    (identifier)))
+    body: (identifier)))
 
 ==================
 String Literal
@@ -246,7 +289,7 @@ name = "Ishaq"
 (source_file
   (function_declaration
     name: (identifier)
-    (string)))
+    body: (string)))
 
 ==================
 Wildcard Pattern
@@ -257,8 +300,9 @@ f _ = 0
 (source_file
   (function_declaration
     name: (identifier)
-    (wildcard)
-    (number)))
+    pattern: (wildcard)
+    body: (number
+      (integer))))
 
 ==================
 With Block
@@ -270,17 +314,20 @@ f x = g x with
 (source_file
   (function_declaration
     name: (identifier)
-    (identifier)
-    (application
-      (identifier)
-      (identifier))
+    pattern: (identifier)
+    body: (application
+      function: (identifier)
+      argument: (identifier))
     (with_block
-      (function_declaration
-        name: (identifier)
-        (identifier)
-        (identifier)
-        (operator)
-        (number)))))
+      (local_binding
+        (function_declaration
+          name: (identifier)
+          pattern: (identifier)
+          body: (binary_expression
+            (identifier)
+            operator: (operator_add)
+            (number
+              (integer))))))))
 
 ==================
 Let-Before Expression
@@ -291,12 +338,14 @@ f x = # y = x + 1
 (source_file
   (function_declaration
     name: (identifier)
-    (identifier)
-    (let_before_expression
-      (identifier)
-      (identifier))
-    (operator)
-    (number)))
+    pattern: (identifier)
+    body: (let_before_expression
+      pattern: (identifier)
+      value: (binary_expression
+        (identifier)
+        operator: (operator_add)
+        (number
+          (integer))))))
 
 ==================
 Let-Before Strict
@@ -307,12 +356,14 @@ f x = #! y = x + 1
 (source_file
   (function_declaration
     name: (identifier)
-    (identifier)
-    (let_before_expression
-      (identifier)
-      (identifier))
-    (operator)
-    (number)))
+    pattern: (identifier)
+    body: (let_before_expression
+      pattern: (identifier)
+      value: (binary_expression
+        (identifier)
+        operator: (operator_add)
+        (number
+          (integer))))))
 
 ==================
 Implementation Module
@@ -322,7 +373,8 @@ implementation module Internal
 
 (source_file
   (module_declaration
-    (identifier)))
+    (module_name
+      (module_identifier))))
 
 ==================
 Definition Module
@@ -332,7 +384,8 @@ definition module Types
 
 (source_file
   (module_declaration
-    (identifier)))
+    (module_name
+      (module_identifier))))
 
 ==================
 System Module
@@ -342,4 +395,5 @@ system module Runtime
 
 (source_file
   (module_declaration
-    (identifier)))
+    (module_name
+      (module_identifier))))

@@ -7,15 +7,23 @@ f xs = [x * 2 \\ x <- xs]
 (source_file
   (function_declaration
     name: (identifier)
-    (identifier)
-    (list_comprehension
-      body: (identifier)
-      body: (operator)
-      body: (number)
-      (comprehension_qualifier
-        (generator
-          pattern: (identifier)
-          expression: (identifier))))))
+    pattern: (identifier)
+    body: (list_expression
+      (binary_expression
+        (binary_expression
+          (binary_expression
+            (identifier)
+            operator: (operator_mul)
+            (number
+              (integer)))
+          operator: (operator_mul)
+          (unary_expression
+            operator: (operator)
+            (identifier)))
+        operator: (operator_compare)
+        (unary_expression
+          operator: (operator)
+          (identifier))))))
 
 ==================
 Comprehension with Let
@@ -26,16 +34,25 @@ f xs = [y \\ x <- xs, let y = x + 1]
 (source_file
   (function_declaration
     name: (identifier)
-    (identifier)
-    (list_comprehension
-      body: (identifier)
-      (comprehension_qualifier
-        (generator
-          pattern: (identifier)
-          expression: (identifier)))
-      (comprehension_qualifier
-        (let_qualifier
-          name: (identifier)
-          value: (identifier)
-          value: (operator)
-          value: (number))))))
+    pattern: (identifier)
+    body: (list_expression
+      (binary_expression
+        (binary_expression
+          (identifier)
+          operator: (operator_mul)
+          (unary_expression
+            operator: (operator)
+            (identifier)))
+        operator: (operator_compare)
+        (unary_expression
+          operator: (operator)
+          (identifier)))
+      (ERROR
+        (local_binding
+          (function_declaration
+            name: (identifier)
+            body: (binary_expression
+              (identifier)
+              operator: (operator_add)
+              (number
+                (integer)))))))))
