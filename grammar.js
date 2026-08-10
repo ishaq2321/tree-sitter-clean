@@ -20,6 +20,27 @@
 // * The grammar exposes supertypes (`_expression`, `_pattern`, `_type`,
 //   `_declaration`) so editor tooling can navigate the tree generically.
 
+// Shared body of every layout block (where/with/class/instance/case): any
+// number of SEMICOLON- or `;`-separated members, then a REQUIRED final
+// member closed by LAYOUT_END or `;`, then an optional trailing LAYOUT_END
+// (which closes the block when the last member was `;`-terminated).
+// LAYOUT_END appears ONLY in closing positions — never as a plain separator
+// inside the repeat — so a dedent always CLOSES the block. The old
+// `repeat1(member (SEMI|END|";"))` treated END as just another separator:
+// after the last member the repeat happily continued, and any identifier at
+// a lower indentation (e.g. the next top-level declaration) silently joined
+// the block as a new member instead of ending it.
+function layoutBlockMembers($, member) {
+  return seq(
+    repeat(seq(member, choice($._layout_semicolon, ";"))),
+    // The final member may be closed by END (a dedent, or EOF when the block
+    // pushed a level), by `;`, or by the trailing SEMICOLON the scanner emits
+    // at EOF for blocks that never pushed a level (e.g. an inline `case`).
+    seq(member, choice($._layout_end, ";", $._layout_semicolon)),
+    optional($._layout_end),
+  );
+}
+
 const PREC = {
   // Term-expressions (highest number binds tightest)
   APPLICATION: 12,
@@ -93,6 +114,8 @@ module.exports = grammar({
     // where/with block repeat: continue with another member vs. end the block
     [$.where_block],
     [$.with_block],
+    // case alternatives: continue with another alternative vs. end the case
+    [$.case_expression],
     [$.macro_definition, $.function_declaration, $.let_qualifier],
     [$.function_declaration, $.let_qualifier],
     // `let (r,st1) = ...`: `(r` starts a tuple/paren pattern or an operator name
@@ -101,6 +124,9 @@ module.exports = grammar({
     // `(op) infix N` — fixity declaration vs. start of a type signature
     // (`(op) infix N :: type`); resolved by what follows
     [$.fixity_declaration, $.signature_name],
+    // `:: T a b = ...`: parameters vs. a new declaration starting after a
+    // bare abstract type (`:: T` followed by `a b = ...`)
+    [$.type_definition],
     // `infix N op ;` — the `;` may close the fixity declaration or act as the
     // next declaration's separator; both consume it, shape differs only
     [$.fixity_declaration],
@@ -346,8 +372,13 @@ module.exports = grammar({
             field("body", $.type_definition_body),
           ),
         ),
-        // `:: T a` — abstract type with parameters (rare, but valid)
-        prec.left(1,
+        // `:: T a` — abstract type with parameters (rare, but valid).
+        // Precedence BELOW the repeat rule's (implicit 0): at `:: T a ...` the
+        // parser must SHIFT a second parameter (inside the generated repeat
+        // rule, which carries no precedence) instead of reducing this branch
+        // early — otherwise `:: T a b = ...` silently misparses as an abstract
+        // `:: T a` followed by a function declaration `b = ...`.
+        prec.left(-1,
           seq(
             "::",
             field("name", $.constructor),
@@ -502,11 +533,7 @@ module.exports = grammar({
           seq(
             "where",
             optional($._layout_start),
-            repeat1(choice(
-              seq($.class_member, $._layout_semicolon),
-              seq($.class_member, $._layout_end),
-              seq($.class_member, ";"),
-            )),
+            layoutBlockMembers($, $.class_member),
           ),
         ),
       ),
@@ -538,11 +565,7 @@ module.exports = grammar({
           seq(
             "where",
             optional($._layout_start),
-            repeat1(choice(
-              seq($.instance_member, $._layout_semicolon),
-              seq($.instance_member, $._layout_end),
-              seq($.instance_member, ";"),
-            )),
+            layoutBlockMembers($, $.instance_member),
           ),
         ),
       ),
@@ -652,22 +675,14 @@ module.exports = grammar({
       seq(
         "where",
         $._inline_layout_start,
-        repeat1(choice(
-          seq($.local_binding, $._layout_semicolon),
-          seq($.local_binding, $._layout_end),
-          seq($.local_binding, ";"),
-        )),
+        layoutBlockMembers($, $.local_binding),
       ),
 
     with_block: ($) =>
       seq(
         "with",
         $._inline_layout_start,
-        repeat1(choice(
-          seq($.local_binding, $._layout_semicolon),
-          seq($.local_binding, $._layout_end),
-          seq($.local_binding, ";"),
-        )),
+        layoutBlockMembers($, $.local_binding),
       ),
 
     local_binding: ($) =>
@@ -919,11 +934,7 @@ module.exports = grammar({
           // where_block) — an optional one would let the parser always take
           // the "stop" path and end the case early.
           optional($._layout_start),
-          repeat1(choice(
-            seq($.case_alternative, choice(";", $._layout_semicolon)),
-            seq($.case_alternative, $._layout_end),
-          )),
-          optional($._layout_end),
+          layoutBlockMembers($, $.case_alternative),
         ),
       ),
 

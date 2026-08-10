@@ -26,7 +26,13 @@
  * to measure its indentation, then compares against the indent stack:
  *   col > current  -> LAYOUT_START     (a new, deeper block begins)
  *   col == current -> LAYOUT_SEMICOLON (a sibling at the same level)
- *   col < current  -> LAYOUT_END       (one or more blocks close)
+ *   col < current  -> LAYOUT_END       (one block closes)
+ * A dedent that falls below several levels emits ONE LAYOUT_END per level:
+ * the scanner pops a single level per token, and the parser — which needs a
+ * closing LAYOUT_END for each open block — requests the next one at the same
+ * position until the stack is drained. This keeps nested where/with blocks
+ * from racing for a single token (which let following declarations escape
+ * into the wrong block).
  * The scanner never opens a block mid-line, so columns inside an expression
  * (e.g. around = or operands) are never mistaken for layout.
  *
@@ -51,6 +57,8 @@ enum TokenType {
 typedef struct {
   uint16_t indent_stack[MAX_INDENT_STACK]; /* column where each block began */
   uint32_t indent_size;                    /* number of open blocks        */
+  uint16_t dedent_target;                  /* column of the current dedent */
+  bool dedenting;                          /* mid multi-level dedent chain */
 } Scanner;
 
 /* Level pushed for a `where`/`with` block that opens on the SAME line as its
@@ -59,9 +67,21 @@ typedef struct {
  * indentation) closes it — hence a sentinel greater than any real column. */
 #define INLINE_BLOCK_LEVEL 0xFFFF
 
+/* Level pushed when the scanner is asked for an inline block-start by a state
+ * that wants EVERY layout token at once (the error-recovery state). Those
+ * requests are not genuine block opens, but the tree-sitter runtime only
+ * accepts a zero-width external token during recovery if the scanner's
+ * serialized state CHANGED — so a level must be pushed for the token to be
+ * skipped at all. Marking it phantom lets the dedent logic pop all phantom
+ * levels in a single token (no block ever consumed one, so none needs its own
+ * closing END), leaving one LAYOUT_END per REAL level. */
+#define PHANTOM_BLOCK_LEVEL (INLINE_BLOCK_LEVEL - 1)
+
 static void scanner_init(Scanner *s) {
   s->indent_stack[0] = 0;
   s->indent_size = 1;
+  s->dedent_target = 0;
+  s->dedenting = false;
 }
 
 void *tree_sitter_clean_external_scanner_create(void) {
@@ -74,31 +94,39 @@ void tree_sitter_clean_external_scanner_destroy(void *payload) {
   free(payload);
 }
 
+/* The serialized payload is the indent stack followed by the dedent-chain
+ * state: 1 byte for `dedenting`, then the 2-byte `dedent_target`. (The stack
+ * is at most MAX_INDENT_STACK * 2 = 200 bytes, well under the buffer size.) */
 unsigned tree_sitter_clean_external_scanner_serialize(void *payload,
                                                      char *buffer) {
   Scanner *s = (Scanner *)payload;
   size_t size = s->indent_size * sizeof(uint16_t);
-  if (size > TREE_SITTER_SERIALIZATION_BUFFER_SIZE) {
-    size = TREE_SITTER_SERIALIZATION_BUFFER_SIZE;
+  if (size + 3 > TREE_SITTER_SERIALIZATION_BUFFER_SIZE) {
+    size = TREE_SITTER_SERIALIZATION_BUFFER_SIZE - 3;
   }
   memcpy(buffer, s->indent_stack, size);
-  return (unsigned)size;
+  char *tail = buffer + size;
+  tail[0] = s->dedenting ? 1 : 0;
+  memcpy(tail + 1, &s->dedent_target, sizeof(uint16_t));
+  return (unsigned)(size + 3);
 }
 
 void tree_sitter_clean_external_scanner_deserialize(void *payload,
                                                     const char *buffer,
                                                     unsigned length) {
   Scanner *s = (Scanner *)payload;
-  if (length == 0) {
+  if (length < 3) {
     scanner_init(s);
     return;
   }
-  size_t n = length / sizeof(uint16_t);
+  size_t n = (length - 3) / sizeof(uint16_t);
   if (n > MAX_INDENT_STACK) {
     n = MAX_INDENT_STACK;
   }
   memcpy(s->indent_stack, buffer, n * sizeof(uint16_t));
   s->indent_size = (uint32_t)n;
+  s->dedenting = buffer[length - 3] != 0;
+  memcpy(&s->dedent_target, buffer + length - 2, sizeof(uint16_t));
 }
 
 /* ---------- helpers ---------------------------------------------------- */
@@ -280,15 +308,72 @@ bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer,
     return false;
   }
 
-  /* 4) If we did not cross a newline, the only layout decision left is an
+  /* 4) Less indented -> close ONE block per token. A dedent can cross
+   *    several layout levels, and each open block needs its own LAYOUT_END,
+   *    so the scanner records the target column and pops a single level; the
+   *    parser then re-requests at the same position and the scanner keeps
+   *    popping one level per request until the stack drains to the target.
+   *    The first token of the chain is measured at a line start; the
+   *    re-requests come mid-position (no newline to measure, `col` is 0), so
+   *    the remembered target — not the freshly measured column — decides when
+   *    to stop. Genuinely mid-line requests (e.g. `want_end` inside a body
+   *    expression) are never treated as dedents.
+   *
+   *    Phantom levels (pushed for error-recovery requests) are popped in one
+   *    go: they were never consumed as block starts, so no block needs an END
+   *    for them — collapsing them keeps the chain short even when error
+   *    recovery piled up many. */
+  if (want_end && ((crossed_newline && col < current) ||
+                   (s->dedenting && current > s->dedent_target))) {
+    if (crossed_newline) {
+      s->dedent_target = col;
+      s->dedenting = true;
+    }
+    while (s->indent_size > 1 &&
+           s->indent_stack[s->indent_size - 1] == PHANTOM_BLOCK_LEVEL) {
+      s->indent_size--;
+    }
+    if (s->indent_size > 1) {
+      s->indent_size--;
+    }
+    lexer->mark_end(lexer);
+    lexer->result_symbol = LAYOUT_END;
+    return true;
+  }
+
+  /* 4b) The dedent chain has drained to its target column. If a block is
+   *     still open at exactly that level, the next token is a SIBLING of the
+   *     last member (emit a semicolon); if we are back at the root, the chain
+   *     is complete and the following token starts a fresh declaration. */
+  if (s->dedenting) {
+    s->dedenting = false;
+    if (want_semi && current == s->dedent_target && s->indent_size > 1) {
+      lexer->mark_end(lexer);
+      lexer->result_symbol = LAYOUT_SEMICOLON;
+      return true;
+    }
+  }
+
+  /* 5) If we did not cross a newline, the only layout decision left is an
    *    INLINE block start: a `where`/`with` opening on the current line
    *    (`... with (ys,zs) = span p xs`). Such a block holds only the
    *    binding on the keyword's line, so push the sentinel level: the very
    *    next line (at any indentation) closes it. */
   if (!crossed_newline) {
     if (want_inline) {
+      /* A genuine `where`/`with` block-open (e.g. `... = b with (ys,zs) =
+       * span p xs`) wants ONLY _inline_layout_start after the keyword, and
+       * pushes a real INLINE level. The error-recovery state instead wants
+       * every token at once (want_semi/start/inline/end all true) and may
+       * sit at one position for many requests; those get a PHANTOM level —
+       * the push keeps the serialized state changing so the runtime accepts
+       * and skips the empty token (mirroring the pre-drain scanner), while
+       * the dedent later collapses all phantoms in one token instead of
+       * draining one LAYOUT_END per bogus level. */
       if (s->indent_size < MAX_INDENT_STACK) {
-        s->indent_stack[s->indent_size++] = INLINE_BLOCK_LEVEL;
+        s->indent_stack[s->indent_size++] =
+            (want_semi || want_start || want_end) ? PHANTOM_BLOCK_LEVEL
+                                                  : INLINE_BLOCK_LEVEL;
       }
       lexer->mark_end(lexer);
       lexer->result_symbol = LAYOUT_INLINE_START;
@@ -297,7 +382,7 @@ bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer,
     return false;
   }
 
-  /* More indented -> open a new block. */
+  /* 6) More indented -> open a new block. */
   if (col > current && (want_start || want_inline)) {
     if (s->indent_size < MAX_INDENT_STACK) {
       s->indent_stack[s->indent_size++] = (uint16_t)col;
@@ -308,23 +393,13 @@ bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer,
     return true;
   }
 
-  /* Same indentation -> sibling separator. But do NOT separate if the next
+  /* 7) Same indentation -> sibling separator. But do NOT separate if the next
    * token is a "where"/"with" continuation keyword: those attach a nested
    * block to the current declaration, so separating here would terminate it
    * prematurely. */
   if (want_semi && col == current && !at_continuation_keyword(lexer)) {
     lexer->mark_end(lexer);
     lexer->result_symbol = LAYOUT_SEMICOLON;
-    return true;
-  }
-
-  /* Less indented -> close one or more blocks. */
-  if (want_end && col < current) {
-    while (s->indent_size > 1 && s->indent_stack[s->indent_size - 1] > col) {
-      s->indent_size--;
-    }
-    lexer->mark_end(lexer);
-    lexer->result_symbol = LAYOUT_END;
     return true;
   }
 

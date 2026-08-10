@@ -19,6 +19,27 @@ ADT Definition
           name: (constructor))))))
 
 ==================
+ADT with Multiple Parameters
+==================
+:: Bimap a b = Map a b
+---
+
+(source_file
+  (type_definition
+    name: (constructor)
+    parameter: (type_variable
+      (identifier))
+    parameter: (type_variable
+      (identifier))
+    body: (type_definition_body
+      rhs: (type_application
+        (constructor)
+        (type_variable
+          (identifier))
+        (type_variable
+          (identifier))))))
+
+==================
 ADT with Records
 ==================
 :: Person = { name :: String, age :: Int }
