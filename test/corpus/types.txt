@@ -99,3 +99,69 @@ instance Show Int where
         body: (application
           function: (identifier)
           argument: (identifier))))))
+
+==================
+Special Pragmas (inline first member)
+==================
+isMember :: a -> Bool | Eq a
+				special a=Int
+						a=Char
+---
+
+(source_file
+  (type_signature
+    name: (signature_name
+      (identifier))
+    type: (type_function
+      (type_variable
+        (identifier))
+      (arrow)
+      (constructor))
+    context: (class_context
+      (constructor)
+      (type_variable
+        (identifier))))
+  (special_block
+    (special_member
+      variable: (type_variable
+        (identifier))
+      type: (constructor))
+    (special_member
+      variable: (type_variable
+        (identifier))
+      type: (constructor))))
+
+==================
+Special Pragmas (block form)
+==================
+sort :: [a] -> [a] | Ord a
+	special
+		a	= Char
+		a	= Int
+---
+
+(source_file
+  (type_signature
+    name: (signature_name
+      (identifier))
+    type: (type_function
+      (list_type
+        (type_variable
+          (identifier)))
+      (arrow)
+      (list_type
+        (type_variable
+          (identifier))))
+    context: (class_context
+      (constructor)
+      (type_variable
+        (identifier))))
+  (special_block
+    (special_member
+      variable: (type_variable
+        (identifier))
+      type: (constructor))
+    (special_member
+      variable: (type_variable
+        (identifier))
+      type: (constructor))))

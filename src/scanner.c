@@ -59,6 +59,7 @@ typedef struct {
   uint32_t indent_size;                    /* number of open blocks        */
   uint16_t dedent_target;                  /* column of the current dedent */
   bool dedenting;                          /* mid multi-level dedent chain */
+  bool pending_block;                      /* block opened mid-line, level deferred */
 } Scanner;
 
 /* Level pushed for a `where`/`with` block that opens on the SAME line as its
@@ -82,6 +83,7 @@ static void scanner_init(Scanner *s) {
   s->indent_size = 1;
   s->dedent_target = 0;
   s->dedenting = false;
+  s->pending_block = false;
 }
 
 void *tree_sitter_clean_external_scanner_create(void) {
@@ -95,38 +97,41 @@ void tree_sitter_clean_external_scanner_destroy(void *payload) {
 }
 
 /* The serialized payload is the indent stack followed by the dedent-chain
- * state: 1 byte for `dedenting`, then the 2-byte `dedent_target`. (The stack
- * is at most MAX_INDENT_STACK * 2 = 200 bytes, well under the buffer size.) */
+ * state: 1 byte for `dedenting`, then the 2-byte `dedent_target`, then 1 byte
+ * for `pending_block`. (The stack is at most MAX_INDENT_STACK * 2 = 200
+ * bytes, well under the buffer size.) */
 unsigned tree_sitter_clean_external_scanner_serialize(void *payload,
                                                      char *buffer) {
   Scanner *s = (Scanner *)payload;
   size_t size = s->indent_size * sizeof(uint16_t);
-  if (size + 3 > TREE_SITTER_SERIALIZATION_BUFFER_SIZE) {
-    size = TREE_SITTER_SERIALIZATION_BUFFER_SIZE - 3;
+  if (size + 4 > TREE_SITTER_SERIALIZATION_BUFFER_SIZE) {
+    size = TREE_SITTER_SERIALIZATION_BUFFER_SIZE - 4;
   }
   memcpy(buffer, s->indent_stack, size);
   char *tail = buffer + size;
   tail[0] = s->dedenting ? 1 : 0;
   memcpy(tail + 1, &s->dedent_target, sizeof(uint16_t));
-  return (unsigned)(size + 3);
+  tail[3] = s->pending_block ? 1 : 0;
+  return (unsigned)(size + 4);
 }
 
 void tree_sitter_clean_external_scanner_deserialize(void *payload,
                                                     const char *buffer,
                                                     unsigned length) {
   Scanner *s = (Scanner *)payload;
-  if (length < 3) {
+  if (length < 4) {
     scanner_init(s);
     return;
   }
-  size_t n = (length - 3) / sizeof(uint16_t);
+  size_t n = (length - 4) / sizeof(uint16_t);
   if (n > MAX_INDENT_STACK) {
     n = MAX_INDENT_STACK;
   }
   memcpy(s->indent_stack, buffer, n * sizeof(uint16_t));
   s->indent_size = (uint32_t)n;
-  s->dedenting = buffer[length - 3] != 0;
-  memcpy(&s->dedent_target, buffer + length - 2, sizeof(uint16_t));
+  s->dedenting = buffer[length - 4] != 0;
+  memcpy(&s->dedent_target, buffer + length - 3, sizeof(uint16_t));
+  s->pending_block = buffer[length - 1] != 0;
 }
 
 /* ---------- helpers ---------------------------------------------------- */
@@ -294,6 +299,30 @@ bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer,
 
   uint16_t current = s->indent_stack[s->indent_size - 1];
 
+  /* 2b) A block opened MID-LINE — its first member sits on the same line as
+   * the opening keyword (`special a=Int` with continuation members on deeper
+   * lines, an inline `case x of 0 -> a`, or `class C a where f :: ...`).
+   * The block's layout level is unknown until the next line, so the start
+   * request (step 5) recorded `pending_block` and emitted a zero-width
+   * LAYOUT_START (a failed scan would DISCARD the flag — tree-sitter only
+   * serializes scanner state after a successful token). Establish the level
+   * here: if the next line is DEEPER than the enclosing level, the block
+   * continues with members at this column — push the column and emit a
+   * sibling separator (the first member is already parsed). Otherwise the
+   * block held only the inline member: clear the flag and fall through, so
+   * the normal logic emits the separator/end for the enclosing context. */
+  if (s->pending_block) {
+    s->pending_block = false;
+    if (crossed_newline && want_semi && col > current) {
+      if (s->indent_size < MAX_INDENT_STACK) {
+        s->indent_stack[s->indent_size++] = (uint16_t)col;
+      }
+      lexer->mark_end(lexer);
+      lexer->result_symbol = LAYOUT_SEMICOLON;
+      return true;
+    }
+  }
+
   /* 3) At EOF, close any open blocks, then emit a trailing separator. */
   if (lexer->eof(lexer)) {
     if (want_end && s->indent_size > 1) {
@@ -354,12 +383,30 @@ bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer,
     }
   }
 
-  /* 5) If we did not cross a newline, the only layout decision left is an
-   *    INLINE block start: a `where`/`with` opening on the current line
-   *    (`... with (ys,zs) = span p xs`). Such a block holds only the
-   *    binding on the keyword's line, so push the sentinel level: the very
-   *    next line (at any indentation) closes it. */
+  /* 5) If we did not cross a newline, the only layout decisions left are
+   *    block starts on the current line. A `where`/`with` opening mid-line
+   *    (`... with (ys,zs) = span p xs`) holds only the binding on the
+   *    keyword's line, so push the sentinel level: the very next line (at
+   *    any indentation) closes it. A `_layout_start` requested mid-line
+   *    (a block whose first member is inline, e.g. `special a=Int`) instead
+   *    defers: see step 2b — the level is established at the next line's
+   *    column if it is deeper, so continuation members join the block. */
   if (!crossed_newline) {
+    /* A mid-line block start with BOTH `_layout_start` and
+     * `_inline_layout_start` valid is a `special` block whose first member
+     * is inline (`special a=Int`): the continuation members sit on deeper
+     * lines whose column is not yet known. Emit a zero-width token (so the
+     * pending flag survives serialization — a failed scan would discard
+     * it) and defer the block level to the next line (step 2b). This exact
+     * combination is unique to `special`: `let`/`case` offer only
+     * `_layout_start`, `where`/`with` only `_inline_layout_start`, and the
+     * error-recovery state sets all four flags. */
+    if (want_start && want_inline && !want_semi && !want_end) {
+      s->pending_block = true;
+      lexer->mark_end(lexer);
+      lexer->result_symbol = LAYOUT_INLINE_START;
+      return true;
+    }
     if (want_inline) {
       /* A genuine `where`/`with` block-open (e.g. `... = b with (ys,zs) =
        * span p xs`) wants ONLY _inline_layout_start after the keyword, and

@@ -97,6 +97,9 @@ module.exports = grammar({
     [$._type, $.strict_type],
     // constructor_pattern `Just a` vs. constructor as expression atom
     [$.constructor_pattern, $._expression_atom],
+    // record pattern `{x, y}` vs. record expression `{x = a}` — same `{ name`
+    // prefix, disambiguated by what follows (`,`/`}` = pattern, `=` = expr)
+    [$.record_pattern, $._expression_atom],
     // comprehension generator body is an expression; in `case`/`with`/let the
     // same tokens could start a pattern. Disambiguate expression vs. pattern.
     [$._pattern, $._expression_atom],
@@ -116,6 +119,8 @@ module.exports = grammar({
     [$.with_block],
     // case alternatives: continue with another alternative vs. end the case
     [$.case_expression],
+    // special members: continue with another member vs. end the block
+    [$.special_block],
     [$.macro_definition, $.function_declaration, $.let_qualifier],
     [$.function_declaration, $.let_qualifier],
     // `let (r,st1) = ...`: `(r` starts a tuple/paren pattern or an operator name
@@ -158,10 +163,12 @@ module.exports = grammar({
         $.function_declaration,
         $.operator_definition,
         $.macro_definition,
+        $.generic_case_definition,
         $.class_declaration,
         $.instance_declaration,
         $.generic_declaration,
         $.derive_declaration,
+        $.special_block,
       ),
 
     // ─────────────────────────────────────────────────────────────────────
@@ -601,6 +608,62 @@ module.exports = grammar({
     derive_declaration: ($) =>
       seq("derive", field("name", $.identifier), repeat1($._type_atom)),
 
+    // `special a=Int` (with `a=Char` on deeper lines) — specialization
+    // pragmas that follow a type signature or instance declaration in
+    // definition modules, requesting specialised instances for overloaded
+    // functions. The members are `typevar = type` pairs laid out as a block;
+    // the first member may sit on the `special` line itself (`special a=Int`),
+    // with continuation members on deeper lines (scanner step 2b).
+    //
+    // Both layout-start tokens are offered so the scanner can recognise the
+    // mid-line (inline first member) case: only this rule has start AND
+    // inline valid together, which lets the scanner defer the block level to
+    // the continuation lines without confusing `let`/`case` (start-only) or
+    // `where`/`with` (inline-only).
+    special_block: ($) =>
+      seq(
+        "special",
+        optional(choice($._layout_start, $._inline_layout_start)),
+        layoutBlockMembers($, $.special_member),
+      ),
+
+    special_member: ($) =>
+      seq(
+        field("variable", $.type_variable),
+        "=",
+        field("type", $._type_atom),
+      ),
+
+    // `bimap{|PAIR|} bx by = ...` — a generic case definition: the generic
+    // function's name followed by `{|kind|}` selecting the type constructor it
+    // specializes. The kind is a type variable (`c`), a constructor (`PAIR`)
+    // or a parenthesised operator (`(->)`). Patterns and body are exactly like
+    // a function declaration (including guards and a trailing where block).
+    generic_case_definition: ($) =>
+      prec.left(
+        seq(
+          field("name", $.identifier),
+          seq(
+            "{",
+            "|",
+            // The kind is a type constructor or variable: `c`, `PAIR`, `(->)`,
+            // or `*` (the product/tuple constructor, lexed as operator_mul).
+            field("kind", choice($.type_variable, $.constructor, $.parenthesized_operator, $.operator_mul)),
+            "|",
+            "}",
+          ),
+          repeat(field("pattern", $._pattern)),
+          choice(
+            seq("=", field("body", $._expression), optional($._where_or_with)),
+            seq(
+              repeat1(seq($.guard_equation, optional($.with_block))),
+              optional(seq("=", field("body", $._expression), optional($.with_block))),
+              optional($.where_block),
+            ),
+          ),
+        ),
+      ),
+
     // ─────────────────────────────────────────────────────────────────────
     // Macros & functions
     // ─────────────────────────────────────────────────────────────────────
@@ -767,12 +830,17 @@ module.exports = grammar({
         "]",
       ),
 
-    // `{ x = a, y = b }`
+    // `{ x = a, y = b }` — also the shorthand `{x, y}` (= `{x = x, y = y}`)
     record_pattern: ($) =>
       seq(
         "{",
-        repeat1(seq(field("field", $.identifier), "=", $._pattern)),
-        repeat(seq(",", seq(field("field", $.identifier), "=", $._pattern))),
+        repeat1(
+          seq(
+            field("field", $.identifier),
+            optional(seq("=", $._pattern)),
+          ),
+        ),
+        repeat(seq(",", seq(field("field", $.identifier), optional(seq("=", $._pattern))))),
         "}",
       ),
 
@@ -853,12 +921,14 @@ module.exports = grammar({
     unary_expression: ($) =>
       prec(PREC.UNARY, seq(field("operator", $.operator), $._expression)),
 
-    // Function application binds tighter than every operator.
+    // Function application binds tighter than every operator. The function
+    // position also accepts field/index accesses so `r.f x` (= `(r.f) x`)
+    // and `a.[i] x` parse as applications of the access result.
     application: ($) =>
       prec.left(
         PREC.APPLICATION,
         seq(
-          field("function", choice($._expression_atom, $.application)),
+          field("function", choice($._expression_atom, $.field_access, $.index_access, $.application)),
           field("argument", $._expression_atom),
         ),
       ),
@@ -1144,6 +1214,7 @@ module.exports = grammar({
         $.record_update,
         $.lambda_expression,
         $.code_expression,
+        $.kind_expression,
       ),
 
     paren_expression: ($) =>
@@ -1158,6 +1229,18 @@ module.exports = grammar({
           ".",
           field("name", $.identifier),
         ),
+      ),
+
+    // `{|*|}` / `{|PAIR|}` / `{|c|}` — a generic kind used as an expression
+    // (e.g. `bx = bimap{|*|}` refers to the generic function specialised at
+    // the product constructor).
+    kind_expression: ($) =>
+      seq(
+        "{",
+        "|",
+        field("kind", choice($.type_variable, $.constructor, $.parenthesized_operator, $.operator_mul)),
+        "|",
+        "}",
       ),
 
     // ─────────────────────────────────────────────────────────────────────
@@ -1198,7 +1281,11 @@ module.exports = grammar({
     parenthesized_operator: ($) =>
       token(
         choice(
-          seq("(", /[~%^*+\-\\<>\/?!#$&=]+/, ")"),
+          // `.` is a valid Clean operator symbol (`(+++.)`); it is safe here
+          // because inside the parens it cannot collide with field access
+          // (`r.f`) or qualified names (`M.f`), which use a bare `.`.
+          // `:` is also valid (`(:=)`, `(::)`? — the stdlib uses `(:=)`).
+          seq("(", /[~%^*+\-\\<>\/?!#$&=@.:]+/, ")"),
           seq("(", "`", /[a-zA-Z_][a-zA-Z0-9_']*/, "`", ")"),
         ),
       ),
@@ -1251,24 +1338,32 @@ module.exports = grammar({
     // `operator_add` (`-`) + `operator_compare` (`>`) tokenization.
     arrow: ($) => token(prec(10, "->")),
 
-    // Generic fallback operator
-    operator: ($) => token(prec(1, /[~%^*+\-\\<>\/?]+/)),
-
-    range_operator: ($) => token(prec(2, "..")),
-
-    // Per-tier built-in operators. Higher `prec` value => tighter binding.
-    // `token(prec(N, ...))` gives lexical precedence so the lexer prefers the
-    // specific multi-char operator (e.g. `&&`) over the catch-all `operator`.
-    operator_exp: ($) => token(prec(9, "^")),
-    operator_mul: ($) => token(prec(8, choice("*", "/", "%", "\\", "mod", "rem"))),
-    operator_add: ($) => token(prec(7, choice("+", "-", "<<<", ">>>"))),
+    // Generic fallback operator. IMPORTANT: every operator token (the tiers
+    // below AND this catch-all) must share the SAME lexical precedence.
+    // tree-sitter's lexer DFA prunes a continuation when its precedence is
+    // LOWER than a token that completes earlier (`prefer_transition`): if the
+    // catch-all had a lower precedence than `operator_add`/`operator_mul`, the
+    // lexer would stop at `+`/`*` and a longer user operator such as `+++` or
+    // `**` could never lex as one token (it would split into `+` + `++`). With
+    // equal precedence the DFA keeps the continuation, longest-match picks the
+    // full run, and declaration order (this rule comes LAST) resolves ties so
+    // the specific tokens still win at their exact strings (`+` → operator_add,
+    // `==` → operator_compare). The `arrow`/`generator_sep` tokens keep higher
+    // precedences (10) so `->`/`<-` still beat `-`/`<`.
+    operator_exp: ($) => token(prec(1, "^")),
+    operator_mul: ($) => token(prec(1, choice("*", "/", "%", "\\", "mod", "rem"))),
+    operator_add: ($) => token(prec(1, choice("+", "-", "<<<", ">>>"))),
     // `:` cons operator. Token precedence 0 (equal to the literal `::`): at
     // `::` the longer literal wins by longest-match, so `::` never splits
     // into two cons operators in merged lexer states.
     operator_cons: ($) => token(prec(0, ":")),
-    operator_compare: ($) => token(prec(5, choice("==", "<>", "<", ">", "<=", ">="))),
-    operator_and: ($) => token(prec(4, choice("&&", "and"))),
-    operator_or: ($) => token(prec(3, choice("||", "or"))),
+    operator_compare: ($) => token(prec(1, choice("==", "<>", "<", ">", "<=", ">="))),
+    operator_and: ($) => token(prec(1, choice("&&", "and"))),
+    operator_or: ($) => token(prec(1, choice("||", "or"))),
+    // Catch-all for any other operator run (`+++`, `***`, `<-+-`, ...).
+    operator: ($) => token(prec(1, /[~%^*+\-\\<>\/?]+/)),
+
+    range_operator: ($) => token(prec(2, "..")),
 
     boolean: ($) => choice("True", "False"),
 
