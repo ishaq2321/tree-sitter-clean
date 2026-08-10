@@ -1,5 +1,6 @@
 #include "tree_sitter/parser.h"
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -56,11 +57,20 @@ enum TokenType {
 
 typedef struct {
   uint16_t indent_stack[MAX_INDENT_STACK]; /* column where each block began */
+  uint8_t level_kind[MAX_INDENT_STACK];    /* how each level was opened      */
   uint32_t indent_size;                    /* number of open blocks        */
   uint16_t dedent_target;                  /* column of the current dedent */
   bool dedenting;                          /* mid multi-level dedent chain */
   bool pending_block;                      /* block opened mid-line, level deferred */
 } Scanner;
+
+/* What kind of construct opened a layout level. A guard bar `|` at the level
+ * of a `where`/`with` member continues the CURRENT function's own guard list
+ * (no separator wanted); a `|` at the level of a guard/case/let block opens a
+ * NEW member of that block (separator wanted). The scanner records how each
+ * level was pushed so the separator decision can tell the two apart. */
+#define LEVEL_KIND_START 0  /* `_layout_start` (guard/case/let blocks) */
+#define LEVEL_KIND_INLINE 1 /* `_inline_layout_start` (where/with)    */
 
 /* Level pushed for a `where`/`with` block that opens on the SAME line as its
  * binding (e.g. `... = b with (ys,zs) = span p xs`). Such a block holds only
@@ -80,6 +90,7 @@ typedef struct {
 
 static void scanner_init(Scanner *s) {
   s->indent_stack[0] = 0;
+  s->level_kind[0] = LEVEL_KIND_START;
   s->indent_size = 1;
   s->dedent_target = 0;
   s->dedenting = false;
@@ -96,23 +107,27 @@ void tree_sitter_clean_external_scanner_destroy(void *payload) {
   free(payload);
 }
 
-/* The serialized payload is the indent stack followed by the dedent-chain
- * state: 1 byte for `dedenting`, then the 2-byte `dedent_target`, then 1 byte
- * for `pending_block`. (The stack is at most MAX_INDENT_STACK * 2 = 200
- * bytes, well under the buffer size.) */
+/* The serialized payload is the indent stack, then the level kinds (one byte
+ * per level), then the dedent-chain state: 1 byte for `dedenting`, the 2-byte
+ * `dedent_target`, and 1 byte for `pending_block`. (The stack is at most
+ * MAX_INDENT_STACK * 3 = 300 bytes, well under the buffer size.) */
 unsigned tree_sitter_clean_external_scanner_serialize(void *payload,
                                                      char *buffer) {
   Scanner *s = (Scanner *)payload;
-  size_t size = s->indent_size * sizeof(uint16_t);
-  if (size + 4 > TREE_SITTER_SERIALIZATION_BUFFER_SIZE) {
-    size = TREE_SITTER_SERIALIZATION_BUFFER_SIZE - 4;
+  size_t stack_bytes = s->indent_size * sizeof(uint16_t);
+  size_t kind_bytes = s->indent_size * sizeof(uint8_t);
+  if (stack_bytes + kind_bytes + 4 > TREE_SITTER_SERIALIZATION_BUFFER_SIZE) {
+    size_t room = TREE_SITTER_SERIALIZATION_BUFFER_SIZE - 4;
+    stack_bytes = (room * sizeof(uint16_t)) / (sizeof(uint16_t) + sizeof(uint8_t));
+    kind_bytes = (stack_bytes * sizeof(uint8_t)) / sizeof(uint16_t);
   }
-  memcpy(buffer, s->indent_stack, size);
-  char *tail = buffer + size;
+  memcpy(buffer, s->indent_stack, stack_bytes);
+  memcpy(buffer + stack_bytes, s->level_kind, kind_bytes);
+  char *tail = buffer + stack_bytes + kind_bytes;
   tail[0] = s->dedenting ? 1 : 0;
   memcpy(tail + 1, &s->dedent_target, sizeof(uint16_t));
   tail[3] = s->pending_block ? 1 : 0;
-  return (unsigned)(size + 4);
+  return (unsigned)(stack_bytes + kind_bytes + 4);
 }
 
 void tree_sitter_clean_external_scanner_deserialize(void *payload,
@@ -123,11 +138,16 @@ void tree_sitter_clean_external_scanner_deserialize(void *payload,
     scanner_init(s);
     return;
   }
-  size_t n = (length - 4) / sizeof(uint16_t);
+  /* Recompute the split between stack bytes and kind bytes (both grow with
+   * the level count; the serialized layout is stack bytes first). */
+  size_t total = length - 4;
+  size_t n = total / (sizeof(uint16_t) + sizeof(uint8_t));
   if (n > MAX_INDENT_STACK) {
     n = MAX_INDENT_STACK;
   }
-  memcpy(s->indent_stack, buffer, n * sizeof(uint16_t));
+  size_t stack_bytes = n * sizeof(uint16_t);
+  memcpy(s->indent_stack, buffer, stack_bytes);
+  memcpy(s->level_kind, buffer + stack_bytes, n * sizeof(uint8_t));
   s->indent_size = (uint32_t)n;
   s->dedenting = buffer[length - 4] != 0;
   memcpy(&s->dedent_target, buffer + length - 3, sizeof(uint16_t));
@@ -143,23 +163,6 @@ static bool is_newline(int32_t c) { return c == '\n' || c == '\r'; }
  * stdlib mixes tabs and spaces at the same visual level (e.g. `\t\t` and
  * `\t    ` in StdInt.icl), which only coincide at width 4. */
 #define TAB_WIDTH 4
-
-/* Returns true if the next input starts a clause that continues the *current*
- * declaration at the same indentation: a "where"/"with" keyword (leading 'w')
- * or a guard bar `| ...`. The scanner must NOT emit a layout separator before
- * these, otherwise the enclosing declaration terminates before consuming the
- * clause (e.g. `f x` then `| cond = ...` on the next line at the same indent
- * would be split into two declarations).
- *
- * We peek WITHOUT consuming: tree-sitter only offers single-char lookahead, so
- * we check the leading character. A top-level identifier that merely starts
- * with 'w' (e.g. "wrap = ...") would suppress one separator, but the parser
- * simply re-attempts parsing at that line and recovers; correctness is
- * preserved. */
-static bool at_continuation_keyword(TSLexer *lexer) {
-  return lexer->lookahead == 'w' || lexer->lookahead == '|';
-}
-
 
 /* Scans the body of a (possibly nested) block comment. The lexer is positioned
  * at the '*' that follows the opening '/'. Consumes up to and including the
@@ -233,6 +236,32 @@ static bool try_scan_block_comment(TSLexer *lexer, uint32_t *col) {
   return true;
 }
 
+/* The lexer is positioned at the start of a word beginning with 'w'.
+ * Consumes the word and reports whether it is exactly `where` or `with` —
+ * the two continuation keywords whose presence at a same-column line start
+ * suppresses the layout separator. A plain identifier like `while`/`when`
+ * must NOT suppress it (it would glue the identifier to the previous
+ * declaration as an application argument). Consuming is safe in both
+ * outcomes: returning false from the scan rewinds the position (so the
+ * keyword case is re-lexed by the internal lexer), and the non-keyword
+ * case re-lexes the word too because the caller marks the token end
+ * BEFORE the word (a zero-width separator). */
+static bool is_where_or_with_keyword(TSLexer *lexer) {
+  char word[8];
+  unsigned len = 0;
+  while (len < 7 &&
+         (lexer->lookahead == '_' ||
+          (lexer->lookahead >= 'a' && lexer->lookahead <= 'z') ||
+          (lexer->lookahead >= 'A' && lexer->lookahead <= 'Z') ||
+          (lexer->lookahead >= '0' && lexer->lookahead <= '9'))) {
+    word[len++] = (char)lexer->lookahead;
+    lexer->advance(lexer, false);
+  }
+  word[len] = '\0';
+  return (len == 5 && memcmp(word, "where", 5) == 0) ||
+         (len == 4 && memcmp(word, "with", 4) == 0);
+}
+
 /* ---------- main scan entry -------------------------------------------- */
 
 bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer,
@@ -243,7 +272,10 @@ bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer,
    *    the layout bookkeeping. They may appear anywhere, not just at line
    *    starts. A "//" line comment is NOT consumed here — we return false
    *    and let the internal lexer handle it. */
-  if (valid_symbols[BLOCK_COMMENT]) {
+  const bool want_semi = valid_symbols[LAYOUT_SEMICOLON];
+  const bool want_start = valid_symbols[LAYOUT_START];
+  const bool want_inline = valid_symbols[LAYOUT_INLINE_START];
+  const bool want_end = valid_symbols[LAYOUT_END];  if (valid_symbols[BLOCK_COMMENT]) {
     uint32_t ignore_col = 0;
     if (try_scan_block_comment(lexer, &ignore_col)) {
       lexer->result_symbol = BLOCK_COMMENT;
@@ -254,12 +286,7 @@ bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer,
     }
   }
 
-  const bool want_semi = valid_symbols[LAYOUT_SEMICOLON];
-  const bool want_start = valid_symbols[LAYOUT_START];
-  const bool want_inline = valid_symbols[LAYOUT_INLINE_START];
-  const bool want_end = valid_symbols[LAYOUT_END];
-
-  if (!(want_semi || want_start || want_inline || want_end)) {
+  if (!(want_semi || want_start || want_inline || want_end || valid_symbols[BLOCK_COMMENT])) {
     return false;
   }
 
@@ -287,7 +314,14 @@ bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer,
     }
     if (c == '/') {
       if (try_scan_block_comment(lexer, &col)) {
-        continue;
+        /* Emit the comment as the token (the internal lexer cannot lex block
+         * comments — they are scanner-exclusive for nesting). The layout
+         * decision is deferred to the next scan, which re-measures the
+         * column from the comment's end. Consuming the comment silently
+         * (and then emitting a layout token) would drop it from the tree. */
+        lexer->mark_end(lexer);
+        lexer->result_symbol = BLOCK_COMMENT;
+        return true;
       }
       /* "//" line comment or a lone '/' at a layout-decision point: bail out
        * (the position is rewound) so the internal lexer handles the comment
@@ -298,7 +332,6 @@ bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer,
   }
 
   uint16_t current = s->indent_stack[s->indent_size - 1];
-
   /* 2b) A block opened MID-LINE — its first member sits on the same line as
    * the opening keyword (`special a=Int` with continuation members on deeper
    * lines, an inline `case x of 0 -> a`, or `class C a where f :: ...`).
@@ -315,7 +348,9 @@ bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer,
     s->pending_block = false;
     if (crossed_newline && want_semi && col > current) {
       if (s->indent_size < MAX_INDENT_STACK) {
-        s->indent_stack[s->indent_size++] = (uint16_t)col;
+        s->indent_stack[s->indent_size] = (uint16_t)col;
+        s->level_kind[s->indent_size] = LEVEL_KIND_START;
+        s->indent_size++;
       }
       lexer->mark_end(lexer);
       lexer->result_symbol = LAYOUT_SEMICOLON;
@@ -373,10 +408,36 @@ bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer,
   /* 4b) The dedent chain has drained to its target column. If a block is
    *     still open at exactly that level, the next token is a SIBLING of the
    *     last member (emit a semicolon); if we are back at the root, the chain
-   *     is complete and the following token starts a fresh declaration. */
+   *     is complete and the following token starts a fresh declaration. A
+   *     `where`/`with` continuation keyword is never separated here: it
+   *     attaches a nested block to the current declaration. A `|` guard is
+   *     separated only at guard-block levels (it starts a NEW member); at a
+   *     where/with member level it continues the current function's guards. */
   if (s->dedenting) {
     s->dedenting = false;
-    if (want_semi && current == s->dedent_target && s->indent_size > 1) {
+    bool skip_sep = false;
+    if (lexer->lookahead == 'w') {
+      /* Check the word before suppressing the separator: `where`/`with`
+       * continue the declaration, but `while`/`when`/`w` start a new one
+       * and MUST be separated (see is_where_or_with_keyword). */
+      lexer->mark_end(lexer);
+      if (is_where_or_with_keyword(lexer)) {
+        return false; /* rewind; internal lexer produces the keyword */
+      }
+      if (want_semi && current == s->dedent_target && s->indent_size > 1) {
+        lexer->result_symbol = LAYOUT_SEMICOLON; /* zero-width at word start */
+        return true;
+      }
+      return false;
+    }
+    skip_sep =
+        (lexer->lookahead == '=' &&
+         (s->indent_size == 1 ||
+          s->level_kind[s->indent_size - 1] == LEVEL_KIND_INLINE)) ||
+        (lexer->lookahead == '|' &&
+         s->level_kind[s->indent_size - 1] == LEVEL_KIND_INLINE);
+    if (want_semi && current == s->dedent_target && s->indent_size > 1 &&
+        !skip_sep) {
       lexer->mark_end(lexer);
       lexer->result_symbol = LAYOUT_SEMICOLON;
       return true;
@@ -418,9 +479,13 @@ bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer,
        * the dedent later collapses all phantoms in one token instead of
        * draining one LAYOUT_END per bogus level. */
       if (s->indent_size < MAX_INDENT_STACK) {
-        s->indent_stack[s->indent_size++] =
+        s->indent_stack[s->indent_size] =
             (want_semi || want_start || want_end) ? PHANTOM_BLOCK_LEVEL
                                                   : INLINE_BLOCK_LEVEL;
+        s->level_kind[s->indent_size] =
+            (want_semi || want_start || want_end) ? LEVEL_KIND_START
+                                                  : LEVEL_KIND_INLINE;
+        s->indent_size++;
       }
       lexer->mark_end(lexer);
       lexer->result_symbol = LAYOUT_INLINE_START;
@@ -432,7 +497,13 @@ bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer,
   /* 6) More indented -> open a new block. */
   if (col > current && (want_start || want_inline)) {
     if (s->indent_size < MAX_INDENT_STACK) {
-      s->indent_stack[s->indent_size++] = (uint16_t)col;
+      s->indent_stack[s->indent_size] = (uint16_t)col;
+      /* A where/with member level hosts the declarations (and their own
+       * guards) at the block's column; a `_layout_start` level hosts the
+       * members of a guard/case/let block, where a `|` starts a NEW member. */
+      s->level_kind[s->indent_size] =
+          (want_inline && !want_start) ? LEVEL_KIND_INLINE : LEVEL_KIND_START;
+      s->indent_size++;
     }
     lexer->mark_end(lexer);
     lexer->result_symbol =
@@ -441,13 +512,41 @@ bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer,
   }
 
   /* 7) Same indentation -> sibling separator. But do NOT separate if the next
-   * token is a "where"/"with" continuation keyword: those attach a nested
-   * block to the current declaration, so separating here would terminate it
-   * prematurely. */
-  if (want_semi && col == current && !at_continuation_keyword(lexer)) {
-    lexer->mark_end(lexer);
-    lexer->result_symbol = LAYOUT_SEMICOLON;
-    return true;
+   * token continues the CURRENT declaration at this level: a "where"/"with"
+   * keyword (attaches a nested block), or a guard bar `|` at a where/with
+   * member level (continues the function's own guard list). A `|` at a
+   * guard/case/let block level DOES get the separator — there it starts a new
+   * member (a nested guard), which must not be swallowed by the previous
+   * member's value expression. */
+  if (want_semi && col == current) {
+    if (lexer->lookahead == 'w') {
+      /* See the 4b branch: only the real `where`/`with` keywords skip the
+       * separator; `while`/`when`/`w` at a line start begin a new
+       * declaration and need the semicolon. */
+      lexer->mark_end(lexer);
+      if (is_where_or_with_keyword(lexer)) {
+        return false; /* rewind; internal lexer produces the keyword */
+      }
+      lexer->result_symbol = LAYOUT_SEMICOLON; /* zero-width at word start */
+      return true;
+    }
+    /* A `=` at a same-column line start continues the CURRENT declaration
+     * when no block member is possible — at the root (`f x` on one line,
+     * `= code { ... }` on the next) or at a where/with member level. At a
+     * guard/case/let block level (LEVEL_KIND_START) the `=` begins a NEW
+     * member and MUST get the separator. No declaration can begin with `=`.
+     */
+    bool skip_sep =
+        (lexer->lookahead == '=' &&
+         (s->indent_size == 1 ||
+          s->level_kind[s->indent_size - 1] == LEVEL_KIND_INLINE)) ||
+        (lexer->lookahead == '|' &&
+         s->level_kind[s->indent_size - 1] == LEVEL_KIND_INLINE);
+    if (!skip_sep) {
+      lexer->mark_end(lexer);
+      lexer->result_symbol = LAYOUT_SEMICOLON;
+      return true;
+    }
   }
 
   return false;

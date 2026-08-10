@@ -32,7 +32,7 @@
 // the block as a new member instead of ending it.
 function layoutBlockMembers($, member) {
   return seq(
-    repeat(seq(member, choice($._layout_semicolon, ";"))),
+    repeat(seq(member, choice($._layout_semicolon, seq(";", optional($._layout_semicolon))))),
     // The final member may be closed by END (a dedent, or EOF when the block
     // pushed a level), by `;`, or by the trailing SEMICOLON the scanner emits
     // at EOF for blocks that never pushed a level (e.g. an inline `case`).
@@ -105,13 +105,28 @@ module.exports = grammar({
     [$._pattern, $._expression_atom],
     // function vs. macro LHS both start with `name pat...`
     [$.function_declaration, $.macro_definition],
+    // a let-before block's `= expr` member vs. ending the function body there
+    [$.function_declaration, $.guard_body],
+    [$.operator_definition, $.guard_body],
     // compound expression as application atom vs as a full expression
     // (e.g. a lambda used as a guard body: `| cond \x -> x = ...`)
     [$._expression, $._expression_atom],
     // class head: trailing type variables vs. context parsing
     [$.class_declaration],
+    // context `,` may continue the item list (`| Eq a, Ord a`) or start
+    // uniqueness constraints (`| Ord a,[u v <= w]`) — GLR explores both;
+    // no precedence on class_context so the branch is not pruned
+    [$.class_context],
     // derive argument list ambiguity
     [$.derive_declaration],
+    // `class ==(..)` — the `(` after a class import is either the `(..)`
+    // all-members suffix or a new parenthesised operator item
+    [$._import_item],
+    // a multi-line import block: after a member + separator, the next line
+    // either continues the block or the import ends (the first member served
+    // as both the repeat and the final member) — GLR keeps both and the
+    // error-free continuation wins
+    [$.import_declaration],
     // instance head: `instance Foo (Bar a)` — parenthesised type vs. tuple
     [$.instance_declaration],
     // where/with block repeat: continue with another member vs. end the block
@@ -125,7 +140,6 @@ module.exports = grammar({
     [$.function_declaration, $.let_qualifier],
     // `let (r,st1) = ...`: `(r` starts a tuple/paren pattern or an operator name
     [$.parenthesized_name, $._pattern],
-    [$.type_signature],
     // `(op) infix N` — fixity declaration vs. start of a type signature
     // (`(op) infix N :: type`); resolved by what follows
     [$.fixity_declaration, $.signature_name],
@@ -139,6 +153,9 @@ module.exports = grammar({
     [$.list_pattern, $.list_expression],
     // case_alternative with guard: body expression consuming `->` vs arrow separator
     [$.binary_expression, $.case_alternative],
+    // guard block members: continue with another member vs. end the block
+    // (nested guards: `| cond` then deeper `#`/`=` lines)
+    [$.guard_equation],
   ],
 
   rules: {
@@ -200,6 +217,8 @@ module.exports = grammar({
     // `import M.N`
     // `import M, M2`
     // `from M import x, y, :: Type`
+    // `from M import` — items may also form a layout block on deeper lines
+    // (`from StdClass import` then `\tclass toString, class ==`).
     import_declaration: ($) =>
       prec.left(
         seq(
@@ -209,24 +228,57 @@ module.exports = grammar({
               "from",
               field("module", $.module_name),
               "import",
-              $._import_item,
-              repeat(seq(",", $._import_item)),
+              choice(
+                // inline list: `from M import x, y`
+                seq($._import_item, repeat(seq(",", $._import_item))),
+                // layout block: each line holds one or more comma-separated
+                // items, with an optional trailing comma before the next line
+                // (`\t:: TypeCode (..),`).
+                seq(
+                  $._layout_start,
+                  layoutBlockMembers(
+                    $,
+                    seq(
+                      $._import_item,
+                      repeat(seq(",", $._import_item)),
+                      optional(","),
+                    ),
+                  ),
+                  optional($._layout_end),
+                ),
+              ),
             ),
           ),
         ),
       ),
 
-    // `x`, `:: Type`, `class C`, `+` — a single imported item (also allows
-    // operators and `class`-prefixed class imports, as in real Clean:
-    // `from StdClass import <=, not, class Ord`).
-    // `x`, `:: Type`, `class C`, `+` — a single imported item (also allows
-    // operators and `class`-prefixed class imports, as in real Clean:
-    // `from StdClass import <=, not, class Ord`).
+    // A single imported item:
+    //   `x`, `:: Type`, `+` — plain value / type / operator imports
+    //   `class Ord`, `class ==(..)` — class imports, `(..)` = all members
+    //   `instance == Char` — instance imports
+    // (as in real Clean: `from StdClass import <=, not, class Ord`).
     _import_item: ($) =>
-      seq(
-        optional("::"),
-        optional("class"),
-        choice($.identifier, $.constructor, $._operator_symbol),
+      choice(
+        seq(
+          optional("::"),
+          choice($.identifier, $.constructor, $._operator_symbol),
+          // `:: TypeCode (..)` — the all-members suffix (lexes as one token)
+          optional($.parenthesized_operator),
+        ),
+        seq(
+          "class",
+          choice($.identifier, $.constructor, $._operator_symbol),
+          // `class ==(..)` — the all-members suffix. `(..)` lexes as a single
+          // parenthesized_operator token, so the suffix must accept it whole.
+          optional($.parenthesized_operator),
+        ),
+        seq(
+          "instance",
+          choice($.identifier, $.constructor, $._operator_symbol),
+          // `instance == Char` / `instance toString (TypeCode)` — the class
+          // and the type it is instantiated for (possibly parenthesised)
+          optional($._type_atom),
+        ),
       ),
 
     // ─────────────────────────────────────────────────────────────────────
@@ -274,21 +326,29 @@ module.exports = grammar({
         field("type", $._type),
         field("context", optional($.class_context)),
         optional($.uniqueness_constraints),
+        // Inline body: `fwriter :: !Real !*File -> *File :== code { ... }` —
+        // stdlib signatures frequently carry an inline ABC-code definition.
+        optional(seq(":==", field("body", $._expression))),
       ),
 
     // `, [u <= v, u <= w]` — uniqueness constraints that follow a signature.
+    // The left side may be a full type (`[w u <= v]` — a uniqueness variable
+    // applied to a type, e.g. `!u:(m v:a)` constrained against `v`).
     uniqueness_constraints: ($) =>
       seq(
         ",",
         "[",
-        repeat1(seq($.identifier, choice("<=", "<"), $.identifier)),
-        repeat(seq(",", seq($.identifier, choice("<=", "<"), $.identifier))),
+        repeat1(seq($._type, choice("<=", "<"), $.identifier)),
+        repeat(seq(",", seq($._type, choice("<=", "<"), $.identifier))),
         "]",
       ),
 
     signature_name: ($) =>
       choice(
         $.identifier,
+        // Exported signatures use capitalized names (`Take :: ...`), which
+        // lex as constructors.
+        $.constructor,
         // symbols-only `operator` (not `_operator_symbol`): the alphanumeric
         // operator tokens (`mod`, `rem`, `and`, `or`) must not be valid at
         // declaration-start states, or `module`/`modify` lex as `mod` + rest.
@@ -309,12 +369,14 @@ module.exports = grammar({
     // ending the context early (left-associativity strangles multi-item
     // contexts like `| + , - , zero a`).
     class_context: ($) =>
-      prec.right(
-        seq(
-          "|",
-          $._context_item,
-          repeat(seq(",", $._context_item)),
-        ),
+      seq(
+        $._pipe,
+        $._context_item,
+        // `,` separates context items; `&` separates parallel (zipped)
+        // constraints (`| == a & UList a`). Both are equally valid after a
+        // `|`, and a following `[u<=v]` constraints bracket is never part of
+        // the context (the GLR conflict declared above keeps that branch).
+        repeat(seq(choice(",", "&"), $._context_item)),
       ),
 
     // A context item is a head plus its type arguments, e.g. `| Eq a`,
@@ -404,7 +466,8 @@ module.exports = grammar({
 
     type_definition_body: ($) =>
       seq(
-        choice("=", ":=="),
+        // `=:` marks a strict type definition (`:: OBJECT a =: OBJECT a`)
+        choice("=", ":==", "=:"),
         field("rhs", $._type_rhs),
       ),
 
@@ -420,11 +483,11 @@ module.exports = grammar({
     // `= Cons a (List a) | Nil`
     data_constructors: ($) =>
       prec.left(
-        seq($.data_constructor, repeat(seq("|", $.data_constructor))),
+        seq($.data_constructor, repeat(seq($._pipe, $.data_constructor))),
       ),
 
     data_constructor: ($) =>
-      prec.left(
+      prec.right(
         seq(
           field("name", $.constructor),
           repeat(field("argument", $._type_atom)),
@@ -493,9 +556,43 @@ module.exports = grammar({
         $.tuple_type,
         $.array_type,
         $.type_paren,
+        $.unit_type,
+        $.question_type,
+        $.builtin_question_type,
       ),
 
-    list_type: ($) => seq("[", $._type, "]"),
+    // `?x`, `?^x`, `?#x` — Clean's builtin strictness types (`?` = strict,
+    // `?^` = unboxed strict, `?#` = strict unboxed), also applied to
+    // constructors (`?^Just x`). All four markers lex as ONE token so the
+    // strict/unboxed prefix is never mistaken for an operator run. Higher
+    // precedence than `builtin_question_type`: `? x` binds the marker to the
+    // type rather than treating `?` as a bare type followed by another atom.
+    question_type: ($) => prec.left(2, seq($.question_marker, $._type_atom)),
+
+    // `?`, `?^`, `?#` as complete types on their own — special pragma members
+    // declare the builtins: `special m= ?; m= ?^`.
+    builtin_question_type: ($) => prec(1, $.question_marker),
+
+    // `()` — the unit type
+    unit_type: ($) => seq("(", ")"),
+
+    // List types cover all four bracket flavours from the Clean report:
+    //   [a]      lazy list
+    //   [!a]     strict-element list        [a!]  spine-strict list
+    //   [!a!]    strict + spine-strict      [|a]  overloaded list
+    //   [#a]     unboxed array type         [#a!] unboxed, spine-strict
+    // plus the bare type constructors `[|]`, `[!]`, `[!!]`, `[#]`, `[#!]`
+    // used in `special` members and `instance length [!]`. The element is
+    // optional (bare constructors) and the trailing `!` is the spine-strict
+    // marker, so `[!!]` is the strict-strict constructor.
+    list_type: ($) =>
+      seq(
+        "[",
+        optional(choice($._pipe, "#")), // overloaded / unboxed marker
+        optional(choice($._type, "!")), // element (bare `!` = strict constructor)
+        optional("!"), // spine-strict marker
+        "]",
+      ),
 
     tuple_type: ($) => seq("(", $._type, ",", $._type, repeat(seq(",", $._type)), ")"),
 
@@ -539,7 +636,10 @@ module.exports = grammar({
         optional(
           seq(
             "where",
-            optional($._layout_start),
+            // Same INLINE level as function where_blocks: members are
+            // declarations whose own guards/`=`-continuations sit at the
+            // member column and must not be separated.
+            $._inline_layout_start,
             layoutBlockMembers($, $.class_member),
           ),
         ),
@@ -568,10 +668,26 @@ module.exports = grammar({
         field("name", $.instance_class),
         repeat1(field("argument", $._type_atom)),
         field("context", optional($.class_context)),
+        // `instance <<< Int :: !*File !Int -> *File :== code { ... }` — an
+        // instance may carry a signature and an inline ABC-code body. The
+        // signature may end with a context (`:: a -> a | Eq a`), mirroring
+        // type_signature.
+        optional(
+          seq(
+            "::",
+            field("type", $._type),
+            field("context", optional($.class_context)),
+            optional($.uniqueness_constraints),
+          ),
+        ),
+        optional(seq(":==", field("body", $._expression))),
         optional(
           seq(
             "where",
-            optional($._layout_start),
+            // Same INLINE level as function where_blocks: members are
+            // declarations whose own guards/`=`-continuations sit at the
+            // member column and must not be separated.
+            $._inline_layout_start,
             layoutBlockMembers($, $.instance_member),
           ),
         ),
@@ -600,13 +716,20 @@ module.exports = grammar({
         "generic",
         field("name", $.identifier),
         repeat1(field("parameter", $.type_variable)),
+        // `generic bimap a b | bimap b a :: .a ->.b` — the dual-generic
+        // context: the same generic function with its arguments reversed.
+        optional(seq($._pipe, field("context", $.identifier), repeat(field("context_arg", $.type_variable)))),
         "::",
         $._type,
       ),
 
-    // `derive g [a]` / `derive g []`
+    // `derive g [a]` / `derive g []` / `derive g (->)`
     derive_declaration: ($) =>
-      seq("derive", field("name", $.identifier), repeat1($._type_atom)),
+      seq(
+        "derive",
+        field("name", $.identifier),
+        repeat1(choice($._type_atom, $.parenthesized_operator)),
+      ),
 
     // `special a=Int` (with `a=Char` on deeper lines) — specialization
     // pragmas that follow a type signature or instance declaration in
@@ -627,11 +750,14 @@ module.exports = grammar({
         layoutBlockMembers($, $.special_member),
       ),
 
+    // A member binds one type variable (`a=Int`) or several, comma-separated
+    // (`l=[#],e=Int`); `;` separates members on the same line.
     special_member: ($) =>
       seq(
         field("variable", $.type_variable),
         "=",
         field("type", $._type_atom),
+        repeat(seq(",", field("variable", $.type_variable), "=", field("type", $._type_atom))),
       ),
 
     // `bimap{|PAIR|} bx by = ...` — a generic case definition: the generic
@@ -645,11 +771,11 @@ module.exports = grammar({
           field("name", $.identifier),
           seq(
             "{",
-            "|",
+            $._pipe,
             // The kind is a type constructor or variable: `c`, `PAIR`, `(->)`,
             // or `*` (the product/tuple constructor, lexed as operator_mul).
             field("kind", choice($.type_variable, $.constructor, $.parenthesized_operator, $.operator_mul)),
-            "|",
+            $._pipe,
             "}",
           ),
           repeat(field("pattern", $._pattern)),
@@ -672,7 +798,9 @@ module.exports = grammar({
     // `` (`bind`) f g :== ... ``)
     macro_definition: ($) =>
       seq(
-        field("name", choice($.identifier, $.parenthesized_operator, $.parenthesized_name)),
+        // Exported macros use capitalized names (`LengthM xs :== length_ 0 xs`),
+        // which lex as constructors.
+        field("name", choice($.identifier, $.constructor, $.parenthesized_operator, $.parenthesized_name)),
         repeat($._pattern),
         ":==",
         field("body", $._expression),
@@ -685,13 +813,42 @@ module.exports = grammar({
     function_declaration: ($) =>
       prec.left(
         seq(
-          field("name", $.identifier),
+          // Exported functions use capitalized names (`Init [|] = ...`), which
+          // lex as constructors.
+          field("name", choice($.identifier, $.constructor)),
           repeat(field("pattern", $._pattern)),
           choice(
             seq("=", field("body", $._expression), optional($._where_or_with)),
             seq(
-              repeat1(seq($.guard_equation, optional($.with_block))),
+              // The scanner emits a layout semicolon before a same-column
+              // guard when the function sits inside a block (e.g. a where
+              // binding) — the enclosing block's member separator is offered
+              // even though the `|` continues THIS function's own guard list.
+              // Accept an optional semicolon so the guard repeat survives.
+              repeat1(seq(optional($._layout_semicolon), $.guard_equation, optional($.with_block))),
               optional(seq("=", field("body", $._expression), optional($.with_block))),
+              optional($.where_block),
+            ),
+            // `f x` / `# y = g x` / `= body` — let-before bindings without
+            // guards (`fopen s i w` then `# (b,f) = fopen_ s i;` then
+            // `= (b,f,w);`). The first member is a `#` binding (never a bare
+            // body, which would make every `f x = e` ambiguous); it must be
+            // followed by at least one more binding or body (a lone binding
+            // is not a complete definition). Members are separated by `;`,
+            // layout semicolons, or mere line adjacency (`# b = fclose_ f`
+            // on one line, `= (b,w)` on the next). The repeat1 makes the
+            // separator after the FIRST binding a forced shift — a repeat
+            // (zero allowed) would let prec.left reduce the declaration
+            // there instead of consuming the `;`.
+            seq(
+              $.guard_binding,
+              repeat1(
+                seq(
+                  optional(choice($._layout_semicolon, seq(";", optional($._layout_semicolon)))),
+                  choice($.guard_binding, $.guard_body),
+                ),
+              ),
+              optional(choice($._layout_semicolon, seq(";", optional($._layout_semicolon)))),
               optional($.where_block),
             ),
           ),
@@ -711,16 +868,60 @@ module.exports = grammar({
           choice(
             seq("=", field("body", $._expression), optional($._where_or_with)),
             seq(
-              repeat1(seq($.guard_equation, optional($.with_block))),
+              repeat1(seq(optional($._layout_semicolon), $.guard_equation, optional($.with_block))),
               optional(seq("=", field("body", $._expression), optional($.with_block))),
+              optional($.where_block),
+            ),
+            // let-before bindings without guards (see function_declaration)
+            seq(
+              $.guard_binding,
+              repeat1(
+                seq(
+                  optional(choice($._layout_semicolon, seq(";", optional($._layout_semicolon)))),
+                  choice($.guard_binding, $.guard_body),
+                ),
+              ),
+              optional(choice($._layout_semicolon, seq(";", optional($._layout_semicolon)))),
               optional($.where_block),
             ),
           ),
         ),
       ),
 
+    // `| cond = body` (inline) or the nested form `| cond` followed by a
+    // deeper block of `# pat = expr` let-before bindings and `= expr` bodies
+    // (the trailing bodies are the "otherwise" alternatives). A body or
+    // binding may carry a trailing `with` block (`= ([x:ys],zs) with
+    // (ys,zs) = span p xs`):
+    //   | p x
+    //       # (ys,zs) = span xs
+    //       = ([|x:ys],zs)
+    //       = ([|],list)
     guard_equation: ($) =>
-      seq("|", field("condition", $._expression), "=", field("body", $._expression)),
+      seq(
+        $._pipe,
+        field("condition", $._expression),
+        choice(
+          seq("=", field("body", $._expression), optional($.with_block)),
+          seq(
+            $._layout_start,
+            layoutBlockMembers(
+              $,
+              choice(
+                $.guard_equation,
+                seq($.guard_binding, optional($.with_block)),
+                seq($.guard_body, optional($.with_block)),
+              ),
+            ),
+            optional($._layout_end),
+          ),
+        ),
+      ),
+
+    guard_body: ($) => seq("=", field("body", $._expression)),
+
+    guard_binding: ($) =>
+      seq(choice("#", "#!"), field("pattern", $._pattern), "=", field("value", $._expression)),
 
     // shared shape for `where`/`with` local-binding blocks
     _where_or_with: ($) =>
@@ -783,6 +984,8 @@ module.exports = grammar({
         $.list_pattern,
         $.record_pattern,
         $.paren_pattern,
+        $.unit_pattern,
+        $.unboxed_pattern,
       ),
 
     wildcard: ($) => "_",
@@ -793,9 +996,14 @@ module.exports = grammar({
     // against `pat`), e.g. `drop n cons=:[a:x] = ...`. The `=:` is a distinct
     // two-character token from the definition `=`.
     strict_binding_pattern: ($) =>
-      prec(PREC.UNARY, seq($.identifier, "=:", $._pattern)),
+      prec(PREC.UNARY, seq($.identifier, $.strict_equal, $._pattern)),
 
     strict_pattern: ($) => prec(PREC.UNARY, seq("!", $._pattern)),
+
+    // `?|C args` / `?^C args` — an unboxed constructor application used as a
+    // pattern (`mapMaybe f (?|Just x) = ...`, `(==) ?^None maybe = ...`).
+    unboxed_pattern: ($) =>
+      prec(PREC.UNARY, seq($.question_marker, $.constructor_pattern)),
 
     // `Cons a (List a)` — zero or more arguments so nullary constructors
     // (`True`, `Nothing`) can stand alone as patterns.
@@ -812,9 +1020,11 @@ module.exports = grammar({
       seq("(", $._pattern, ",", $._pattern, repeat(seq(",", $._pattern)), ")"),
 
     // `[a, b]` or `[h:t]` (cons pattern) or `[]` (empty list)
+    // `[|x:xs]`, `[|]` — overloaded-list patterns (`|` after the bracket)
     list_pattern: ($) =>
       seq(
         "[",
+        optional($._pipe),
         optional(
           seq(
             $._pattern,
@@ -845,6 +1055,12 @@ module.exports = grammar({
       ),
 
     paren_pattern: ($) => seq("(", $._pattern, optional($.operator), ")"),
+
+    // `()` — the unit pattern (paren_pattern needs at least one sub-pattern,
+    // so the empty form must be its own rule). Lower precedence than the unit
+    // expression: the two share a GLR state and tree-sitter picks one on
+    // lookahead alone, so the expression interpretation wins ties.
+    unit_pattern: ($) => prec(1, seq("(", ")")),
 
     _pattern_atom: ($) =>
       choice(
@@ -906,6 +1122,9 @@ module.exports = grammar({
         prec.left(PREC.OR, seq($._expression, field("operator", $.operator_or), $._expression)),
         prec.left(PREC.AND, seq($._expression, field("operator", $.operator_and), $._expression)),
         prec.left(PREC.COMPARE, seq($._expression, field("operator", $.operator_compare), $._expression)),
+        // `m =: ?|Just _` — strict match/equality in expression position
+        // (the same `=:` token that strict_binding_pattern uses in patterns)
+        prec.left(PREC.COMPARE, seq($._expression, field("operator", $.strict_equal), $._expression)),
         prec.right(PREC.RANGE, seq($._expression, $.range_operator, $._expression)),
         prec.left(PREC.ADD, seq($._expression, field("operator", $.operator_add), $._expression)),
         prec.left(PREC.MULTIPLY, seq($._expression, field("operator", $.operator_mul), $._expression)),
@@ -1013,7 +1232,7 @@ module.exports = grammar({
         // with guard: pat | cond -> body
         prec(2, seq(
           field("pattern", $._pattern),
-          "|",
+          $._pipe,
           field("condition", $._expression),
           $.arrow,
           field("body", $._expression),
@@ -1026,25 +1245,42 @@ module.exports = grammar({
         )),
       ),
 
-    // `if c then a else b`
+    // `if c then a else b` (keyword form) or `if c a b` (function form — in
+    // Clean `if` is an ordinary three-argument function). The function form
+    // binds tighter than application (prec 13 > APPLICATION 12) so the
+    // consequence stops before the alternative: `if c a b` must not parse the
+    // consequence as the application `a b`.
     if_expression: ($) =>
-      prec.left(
-        seq(
-          "if",
-          field("condition", $._expression),
-          "then",
-          field("consequence", $._expression),
-          "else",
-          field("alternative", $._expression),
+      choice(
+        prec.left(
+          seq(
+            "if",
+            field("condition", $._expression),
+            "then",
+            field("consequence", $._expression),
+            "else",
+            field("alternative", $._expression),
+          ),
+        ),
+        prec.left(
+          13,
+          seq(
+            "if",
+            field("condition", $._expression_atom),
+            field("consequence", $._expression_atom),
+            field("alternative", $._expression_atom),
+          ),
         ),
       ),
 
     // ---- Lists, tuples, arrays ----
 
     // `[1, 2, 3]` or `[h: t]` (cons)
+    // `[|x:xs]`, `[|]` — overloaded-list expressions (`|` after the bracket)
     list_expression: ($) =>
       seq(
         "[",
+        optional($._pipe),
         optional(
           seq(
             $._expression,
@@ -1093,18 +1329,20 @@ module.exports = grammar({
         optional(choice("!", "#")),
         field("body", $._expression),
         $.comprehension_sep,
-        repeat1(seq($.comprehension_qualifier, optional(choice(",", "&", "|")))),
+        repeat1(seq($.comprehension_qualifier, optional(choice(",", "&", $._pipe)))),
         "}",
       ),
 
     // `[x \\ x <- xs]`
     // `[x \\ x <- xs & y <- ys]` — `&` separates parallel (zipped) generators
+    // `[| (x,y,z) \\ ((x,y),z) <- xs]` — overloaded-list comprehension
     list_comprehension: ($) =>
       seq(
         "[",
+        optional($._pipe),
         field("body", $._expression),
         $.comprehension_sep,
-        repeat1(seq($.comprehension_qualifier, optional(choice(",", "&", "|")))),
+        repeat1(seq($.comprehension_qualifier, optional(choice(",", "&", $._pipe)))),
         "]",
       ),
 
@@ -1215,10 +1453,25 @@ module.exports = grammar({
         $.lambda_expression,
         $.code_expression,
         $.kind_expression,
+        $.unit_expression,
+        // `?|C args` / `?^C args` — an unboxed constructor application in an
+        // expression (`maybeToList ?|None`, `?|Just (f x)`).
+        $.unboxed_expression,
       ),
 
+    unboxed_expression: ($) =>
+      prec(PREC.UNARY, seq($.question_marker, $._expression_atom)),
+
+    // `(x)` normally holds an expression; `(++||)` — an operator that cannot
+    // lex as the dedicated `parenthesized_operator` token (e.g. one containing
+    // `|`) — is a parenthesised operator used as a function value. Operators
+    // that *can* lex as `parenthesized_operator` (`(+)`, `(==)`) never reach
+    // here: the longer token wins in the lexer.
     paren_expression: ($) =>
       seq("(", $._expression, ")"),
+
+    // `()` — the unit value (paren_expression needs at least one sub-expression)
+    unit_expression: ($) => prec(2, seq("(", ")")),
 
     // `Module.function` / `Module.Type`
     qualified_identifier: ($) =>
@@ -1237,9 +1490,9 @@ module.exports = grammar({
     kind_expression: ($) =>
       seq(
         "{",
-        "|",
+        $._pipe,
         field("kind", choice($.type_variable, $.constructor, $.parenthesized_operator, $.operator_mul)),
-        "|",
+        $._pipe,
         "}",
       ),
 
@@ -1285,7 +1538,7 @@ module.exports = grammar({
           // because inside the parens it cannot collide with field access
           // (`r.f`) or qualified names (`M.f`), which use a bare `.`.
           // `:` is also valid (`(:=)`, `(::)`? — the stdlib uses `(:=)`).
-          seq("(", /[~%^*+\-\\<>\/?!#$&=@.:]+/, ")"),
+          seq("(", /[~%^*+\-\\<>\/?!#$&=@.:|]+/, ")"),
           seq("(", "`", /[a-zA-Z_][a-zA-Z0-9_']*/, "`", ")"),
         ),
       ),
@@ -1359,9 +1612,35 @@ module.exports = grammar({
     operator_cons: ($) => token(prec(0, ":")),
     operator_compare: ($) => token(prec(1, choice("==", "<>", "<", ">", "<=", ">="))),
     operator_and: ($) => token(prec(1, choice("&&", "and"))),
-    operator_or: ($) => token(prec(1, choice("||", "or"))),
+    operator_or: ($) => token(prec(2, choice("||", "or"))),
+    // `?`, `?^`, `?#`, `?|` — Clean's strictness/unboxed marker prefixes
+    // (`?x` strict type, `?^x`/`?#x` unboxed, `?|C`/`?^C` unboxed constructor
+    // applications in patterns/expressions). A dedicated token with lexical
+    // precedence 2 beats the catch-all `operator` (prec 1) at equal length,
+    // and it covers `?#`, which the operator alphabet cannot lex at all
+    // (`#` is not an operator symbol).
+    question_marker: ($) => token(prec(2, choice("?", "?^", "?#", "?|"))),
+
+    // `=:` — strict match/equality: an infix operator in expressions
+    // (`m =: ?|Just _`) and the strict pattern-binding marker (`x=:pat`).
+    // Dedicated token (prec 2) so it is never split or out-lexed in either
+    // position.
+    strict_equal: ($) => token(prec(2, "=:")),
+
     // Catch-all for any other operator run (`+++`, `***`, `<-+-`, ...).
-    operator: ($) => token(prec(1, /[~%^*+\-\\<>\/?]+/)),
+    // The catch-all user operator. `|` is included so operators like `++|`
+    // and `++||` (overloaded-list append, StdOverloadedList) lex as one
+    // token. A lone `|` in a guard/context/`[|` position still lexes as the
+    // literal `|` (literals have implicit precedence 2, beating this token's
+    // explicit 1 at equal length), so those uses are unaffected.
+    // The literal `|` used in guards (`f x | p = b`), contexts (`| Eq a`),
+    // overloaded-list markers (`[|x:xs]`) and generic kind brackets
+    // (`{|PAIR|}`). Explicit lexical precedence 2 so it beats the catch-all
+    // `operator` (prec 1) at equal length — otherwise `[|]` would lex `|` as
+    // a unary operator. `||` (operator_or) is longer, so it still wins.
+    _pipe: ($) => token(prec(2, "|")),
+
+    operator: ($) => token(prec(1, /[~%^*+\-\\<>\/?|$]+/)),
 
     range_operator: ($) => token(prec(2, "..")),
 
@@ -1378,7 +1657,9 @@ module.exports = grammar({
 
     string: ($) => /"([^"\\]|\\.)*"/,
 
-    char: ($) => /'([^'\\]|\\.)'/,
+    // Char literals: `'a'`, `'\n'`, `'\''`, and octal escapes like `'\177'`
+    // (backslash + 1-3 octal digits).
+    char: ($) => /'([^'\\]|\\([0-9]{1,3}|[^0-9]))'/,
 
     // `//` is always a line comment in Clean (the language reserves it — it
     // can never be an operator), so it must out-prioritise every operator

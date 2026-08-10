@@ -1,0 +1,145 @@
+==================
+Let-Before Bindings
+==================
+fopen s i w
+	# (b,f) = fopen_ s i;
+	= (b,f,w);
+
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    pattern: (identifier)
+    pattern: (identifier)
+    pattern: (identifier)
+    (guard_binding
+      pattern: (tuple_pattern
+        (identifier)
+        (identifier))
+      value: (application
+        function: (application
+          function: (identifier)
+          argument: (identifier))
+        argument: (identifier)))
+    (guard_body
+      body: (tuple_expression
+        (identifier)
+        (identifier)
+        (identifier)))))
+
+==================
+Let-Before Without Semicolons
+==================
+fclose f w
+	# b = fclose_ f
+	= (b,w);
+
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    pattern: (identifier)
+    pattern: (identifier)
+    (guard_binding
+      pattern: (identifier)
+      value: (application
+        function: (identifier)
+        argument: (identifier)))
+    (guard_body
+      body: (tuple_expression
+        (identifier)
+        (identifier)))))
+
+==================
+Unboxed Markers and Strict Equal
+==================
+isJust m :== m =: ?|Just _
+
+---
+
+(source_file
+  (macro_definition
+    name: (identifier)
+    (identifier)
+    body: (binary_expression
+      (identifier)
+      operator: (strict_equal)
+      (application
+        function: (unboxed_expression
+          (question_marker)
+          (constructor))
+        argument: (identifier)))))
+
+==================
+Unboxed Type Constructors
+==================
+:: Maybe x :== ?^ x
+instance == (?^x) | == x
+
+---
+
+(source_file
+  (type_definition
+    name: (constructor)
+    parameter: (type_variable
+      (identifier))
+    body: (type_definition_body
+      rhs: (question_type
+        (question_marker)
+        (type_variable
+          (identifier)))))
+  (instance_declaration
+    name: (instance_class
+      (operator_compare))
+    argument: (type_paren
+      (question_type
+        (question_marker)
+        (type_variable
+          (identifier))))
+    context: (class_context
+      (operator_compare)
+      (type_variable
+        (identifier)))))
+
+==================
+Multi-Line Import Block
+==================
+from StdClass import
+	class toString, class ==
+
+	:: TypeCode (..),
+	instance == TypeCode,
+
+---
+
+(source_file
+  (import_declaration
+    module: (module_name
+      (module_identifier))
+    (identifier)
+    (operator_compare)
+    (constructor)
+    (parenthesized_operator)
+    (operator_compare)
+    (constructor)))
+
+==================
+Body on the Next Line
+==================
+sfopen_ s i
+= code inline {
+	.d 1 1 i
+		jsr	openSF
+  }
+
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    pattern: (identifier)
+    pattern: (identifier)
+    body: (code_expression
+      (abc_instruction))))

@@ -180,6 +180,14 @@
       {
         "type": "unary_expression",
         "named": true
+      },
+      {
+        "type": "unboxed_expression",
+        "named": true
+      },
+      {
+        "type": "unit_expression",
+        "named": true
       }
     ]
   },
@@ -236,6 +244,14 @@
         "named": true
       },
       {
+        "type": "unboxed_pattern",
+        "named": true
+      },
+      {
+        "type": "unit_pattern",
+        "named": true
+      },
+      {
         "type": "wildcard",
         "named": true
       }
@@ -250,6 +266,10 @@
         "named": true
       },
       {
+        "type": "builtin_question_type",
+        "named": true
+      },
+      {
         "type": "constructor",
         "named": true
       },
@@ -259,6 +279,10 @@
       },
       {
         "type": "list_type",
+        "named": true
+      },
+      {
+        "type": "question_type",
         "named": true
       },
       {
@@ -291,6 +315,10 @@
       },
       {
         "type": "uniqueness_type",
+        "named": true
+      },
+      {
+        "type": "unit_type",
         "named": true
       }
     ]
@@ -381,6 +409,14 @@
           },
           {
             "type": "tuple_expression",
+            "named": true
+          },
+          {
+            "type": "unboxed_expression",
+            "named": true
+          },
+          {
+            "type": "unit_expression",
             "named": true
           }
         ]
@@ -479,6 +515,14 @@
           },
           {
             "type": "tuple_expression",
+            "named": true
+          },
+          {
+            "type": "unboxed_expression",
+            "named": true
+          },
+          {
+            "type": "unit_expression",
             "named": true
           }
         ]
@@ -588,6 +632,10 @@
           {
             "type": "operator_or",
             "named": true
+          },
+          {
+            "type": "strict_equal",
+            "named": true
           }
         ]
       }
@@ -611,6 +659,21 @@
     "type": "boolean",
     "named": true,
     "fields": {}
+  },
+  {
+    "type": "builtin_question_type",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "question_marker",
+          "named": true
+        }
+      ]
+    }
   },
   {
     "type": "case_alternative",
@@ -697,6 +760,10 @@
           "named": true
         },
         {
+          "type": "builtin_question_type",
+          "named": true
+        },
+        {
           "type": "constructor",
           "named": true
         },
@@ -753,6 +820,10 @@
           "named": true
         },
         {
+          "type": "question_type",
+          "named": true
+        },
+        {
           "type": "strict_type",
           "named": true
         },
@@ -774,6 +845,10 @@
         },
         {
           "type": "uniqueness_type",
+          "named": true
+        },
+        {
+          "type": "unit_type",
           "named": true
         }
       ]
@@ -1030,6 +1105,10 @@
             "named": true
           },
           {
+            "type": "builtin_question_type",
+            "named": true
+          },
+          {
             "type": "constructor",
             "named": true
           },
@@ -1039,6 +1118,10 @@
           },
           {
             "type": "list_type",
+            "named": true
+          },
+          {
+            "type": "question_type",
             "named": true
           },
           {
@@ -1063,6 +1146,10 @@
           },
           {
             "type": "uniqueness_type",
+            "named": true
+          },
+          {
+            "type": "unit_type",
             "named": true
           }
         ]
@@ -1118,6 +1205,10 @@
           "named": true
         },
         {
+          "type": "builtin_question_type",
+          "named": true
+        },
+        {
           "type": "constructor",
           "named": true
         },
@@ -1127,6 +1218,14 @@
         },
         {
           "type": "list_type",
+          "named": true
+        },
+        {
+          "type": "parenthesized_operator",
+          "named": true
+        },
+        {
+          "type": "question_type",
           "named": true
         },
         {
@@ -1151,6 +1250,10 @@
         },
         {
           "type": "uniqueness_type",
+          "named": true
+        },
+        {
+          "type": "unit_type",
           "named": true
         }
       ]
@@ -1169,6 +1272,10 @@
           "named": true
         },
         {
+          "type": "builtin_question_type",
+          "named": true
+        },
+        {
           "type": "constructor",
           "named": true
         },
@@ -1178,6 +1285,10 @@
         },
         {
           "type": "list_type",
+          "named": true
+        },
+        {
+          "type": "question_type",
           "named": true
         },
         {
@@ -1202,6 +1313,10 @@
         },
         {
           "type": "uniqueness_type",
+          "named": true
+        },
+        {
+          "type": "unit_type",
           "named": true
         }
       ]
@@ -1311,6 +1426,14 @@
           },
           {
             "type": "tuple_expression",
+            "named": true
+          },
+          {
+            "type": "unboxed_expression",
+            "named": true
+          },
+          {
+            "type": "unit_expression",
             "named": true
           }
         ]
@@ -1431,6 +1554,10 @@
         "required": true,
         "types": [
           {
+            "type": "constructor",
+            "named": true
+          },
+          {
             "type": "identifier",
             "named": true
           }
@@ -1451,6 +1578,14 @@
       "multiple": true,
       "required": false,
       "types": [
+        {
+          "type": "guard_binding",
+          "named": true
+        },
+        {
+          "type": "guard_body",
+          "named": true
+        },
         {
           "type": "guard_equation",
           "named": true
@@ -1582,6 +1717,26 @@
     "type": "generic_declaration",
     "named": true,
     "fields": {
+      "context": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "context_arg": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "type_variable",
+            "named": true
+          }
+        ]
+      },
       "name": {
         "multiple": false,
         "required": true,
@@ -1631,12 +1786,54 @@
     }
   },
   {
-    "type": "guard_equation",
+    "type": "guard_binding",
+    "named": true,
+    "fields": {
+      "pattern": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "_pattern",
+            "named": true
+          }
+        ]
+      },
+      "value": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "_expression",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "guard_body",
     "named": true,
     "fields": {
       "body": {
         "multiple": false,
         "required": true,
+        "types": [
+          {
+            "type": "_expression",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "guard_equation",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": false,
         "types": [
           {
             "type": "_expression",
@@ -1654,6 +1851,28 @@
           }
         ]
       }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "guard_binding",
+          "named": true
+        },
+        {
+          "type": "guard_body",
+          "named": true
+        },
+        {
+          "type": "guard_equation",
+          "named": true
+        },
+        {
+          "type": "with_block",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -1712,11 +1931,27 @@
       "required": false,
       "types": [
         {
+          "type": "array_type",
+          "named": true
+        },
+        {
+          "type": "builtin_question_type",
+          "named": true
+        },
+        {
           "type": "constructor",
           "named": true
         },
         {
+          "type": "dotted_type",
+          "named": true
+        },
+        {
           "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "list_type",
           "named": true
         },
         {
@@ -1749,6 +1984,42 @@
         },
         {
           "type": "operator_or",
+          "named": true
+        },
+        {
+          "type": "parenthesized_operator",
+          "named": true
+        },
+        {
+          "type": "question_type",
+          "named": true
+        },
+        {
+          "type": "strict_type",
+          "named": true
+        },
+        {
+          "type": "tuple_type",
+          "named": true
+        },
+        {
+          "type": "type_paren",
+          "named": true
+        },
+        {
+          "type": "type_variable",
+          "named": true
+        },
+        {
+          "type": "unique_var_type",
+          "named": true
+        },
+        {
+          "type": "uniqueness_type",
+          "named": true
+        },
+        {
+          "type": "unit_type",
           "named": true
         }
       ]
@@ -1849,6 +2120,14 @@
           {
             "type": "tuple_expression",
             "named": true
+          },
+          {
+            "type": "unboxed_expression",
+            "named": true
+          },
+          {
+            "type": "unit_expression",
+            "named": true
           }
         ]
       }
@@ -1936,6 +2215,10 @@
             "named": true
           },
           {
+            "type": "builtin_question_type",
+            "named": true
+          },
+          {
             "type": "constructor",
             "named": true
           },
@@ -1945,6 +2228,10 @@
           },
           {
             "type": "list_type",
+            "named": true
+          },
+          {
+            "type": "question_type",
             "named": true
           },
           {
@@ -1970,11 +2257,25 @@
           {
             "type": "uniqueness_type",
             "named": true
+          },
+          {
+            "type": "unit_type",
+            "named": true
+          }
+        ]
+      },
+      "body": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "_expression",
+            "named": true
           }
         ]
       },
       "context": {
-        "multiple": false,
+        "multiple": true,
         "required": false,
         "types": [
           {
@@ -1992,6 +2293,16 @@
             "named": true
           }
         ]
+      },
+      "type": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "_type",
+            "named": true
+          }
+        ]
       }
     },
     "children": {
@@ -2000,6 +2311,10 @@
       "types": [
         {
           "type": "instance_member",
+          "named": true
+        },
+        {
+          "type": "uniqueness_constraints",
           "named": true
         }
       ]
@@ -2283,7 +2598,7 @@
     "fields": {},
     "children": {
       "multiple": false,
-      "required": true,
+      "required": false,
       "types": [
         {
           "type": "_type",
@@ -2382,6 +2697,10 @@
         "multiple": false,
         "required": true,
         "types": [
+          {
+            "type": "constructor",
+            "named": true
+          },
           {
             "type": "identifier",
             "named": true
@@ -2514,6 +2833,14 @@
       "required": false,
       "types": [
         {
+          "type": "guard_binding",
+          "named": true
+        },
+        {
+          "type": "guard_body",
+          "named": true
+        },
+        {
           "type": "guard_equation",
           "named": true
         },
@@ -2601,6 +2928,73 @@
           }
         ]
       }
+    }
+  },
+  {
+    "type": "question_type",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "array_type",
+          "named": true
+        },
+        {
+          "type": "builtin_question_type",
+          "named": true
+        },
+        {
+          "type": "constructor",
+          "named": true
+        },
+        {
+          "type": "dotted_type",
+          "named": true
+        },
+        {
+          "type": "list_type",
+          "named": true
+        },
+        {
+          "type": "question_marker",
+          "named": true
+        },
+        {
+          "type": "question_type",
+          "named": true
+        },
+        {
+          "type": "strict_type",
+          "named": true
+        },
+        {
+          "type": "tuple_type",
+          "named": true
+        },
+        {
+          "type": "type_paren",
+          "named": true
+        },
+        {
+          "type": "type_variable",
+          "named": true
+        },
+        {
+          "type": "unique_var_type",
+          "named": true
+        },
+        {
+          "type": "uniqueness_type",
+          "named": true
+        },
+        {
+          "type": "unit_type",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -2756,6 +3150,10 @@
       "required": true,
       "types": [
         {
+          "type": "constructor",
+          "named": true
+        },
+        {
           "type": "identifier",
           "named": true
         },
@@ -2810,11 +3208,15 @@
     "named": true,
     "fields": {
       "type": {
-        "multiple": false,
+        "multiple": true,
         "required": true,
         "types": [
           {
             "type": "array_type",
+            "named": true
+          },
+          {
+            "type": "builtin_question_type",
             "named": true
           },
           {
@@ -2827,6 +3229,10 @@
           },
           {
             "type": "list_type",
+            "named": true
+          },
+          {
+            "type": "question_type",
             "named": true
           },
           {
@@ -2852,11 +3258,15 @@
           {
             "type": "uniqueness_type",
             "named": true
+          },
+          {
+            "type": "unit_type",
+            "named": true
           }
         ]
       },
       "variable": {
-        "multiple": false,
+        "multiple": true,
         "required": true,
         "types": [
           {
@@ -2877,6 +3287,10 @@
       "types": [
         {
           "type": "_pattern",
+          "named": true
+        },
+        {
+          "type": "strict_equal",
           "named": true
         }
       ]
@@ -2910,6 +3324,10 @@
           "named": true
         },
         {
+          "type": "builtin_question_type",
+          "named": true
+        },
+        {
           "type": "constructor",
           "named": true
         },
@@ -2919,6 +3337,10 @@
         },
         {
           "type": "list_type",
+          "named": true
+        },
+        {
+          "type": "question_type",
           "named": true
         },
         {
@@ -2943,6 +3365,10 @@
         },
         {
           "type": "uniqueness_type",
+          "named": true
+        },
+        {
+          "type": "unit_type",
           "named": true
         }
       ]
@@ -3006,6 +3432,10 @@
           "named": true
         },
         {
+          "type": "builtin_question_type",
+          "named": true
+        },
+        {
           "type": "constructor",
           "named": true
         },
@@ -3015,6 +3445,10 @@
         },
         {
           "type": "list_type",
+          "named": true
+        },
+        {
+          "type": "question_type",
           "named": true
         },
         {
@@ -3039,6 +3473,10 @@
         },
         {
           "type": "uniqueness_type",
+          "named": true
+        },
+        {
+          "type": "unit_type",
           "named": true
         }
       ]
@@ -3142,6 +3580,16 @@
     "type": "type_signature",
     "named": true,
     "fields": {
+      "body": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "_expression",
+            "named": true
+          }
+        ]
+      },
       "context": {
         "multiple": false,
         "required": false,
@@ -3236,6 +3684,128 @@
     }
   },
   {
+    "type": "unboxed_expression",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "array_comprehension",
+          "named": true
+        },
+        {
+          "type": "array_expression",
+          "named": true
+        },
+        {
+          "type": "boolean",
+          "named": true
+        },
+        {
+          "type": "char",
+          "named": true
+        },
+        {
+          "type": "code_expression",
+          "named": true
+        },
+        {
+          "type": "constructor",
+          "named": true
+        },
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "kind_expression",
+          "named": true
+        },
+        {
+          "type": "lambda_expression",
+          "named": true
+        },
+        {
+          "type": "list_comprehension",
+          "named": true
+        },
+        {
+          "type": "list_expression",
+          "named": true
+        },
+        {
+          "type": "number",
+          "named": true
+        },
+        {
+          "type": "paren_expression",
+          "named": true
+        },
+        {
+          "type": "parenthesized_operator",
+          "named": true
+        },
+        {
+          "type": "qualified_identifier",
+          "named": true
+        },
+        {
+          "type": "question_marker",
+          "named": true
+        },
+        {
+          "type": "range_expression",
+          "named": true
+        },
+        {
+          "type": "record_expression",
+          "named": true
+        },
+        {
+          "type": "record_update",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        },
+        {
+          "type": "tuple_expression",
+          "named": true
+        },
+        {
+          "type": "unboxed_expression",
+          "named": true
+        },
+        {
+          "type": "unit_expression",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "unboxed_pattern",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "constructor_pattern",
+          "named": true
+        },
+        {
+          "type": "question_marker",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "unique_var_type",
     "named": true,
     "fields": {},
@@ -3245,6 +3815,10 @@
       "types": [
         {
           "type": "array_type",
+          "named": true
+        },
+        {
+          "type": "builtin_question_type",
           "named": true
         },
         {
@@ -3261,6 +3835,10 @@
         },
         {
           "type": "list_type",
+          "named": true
+        },
+        {
+          "type": "question_type",
           "named": true
         },
         {
@@ -3286,6 +3864,10 @@
         {
           "type": "uniqueness_type",
           "named": true
+        },
+        {
+          "type": "unit_type",
+          "named": true
         }
       ]
     }
@@ -3298,6 +3880,10 @@
       "multiple": true,
       "required": true,
       "types": [
+        {
+          "type": "_type",
+          "named": true
+        },
         {
           "type": "identifier",
           "named": true
@@ -3318,6 +3904,10 @@
           "named": true
         },
         {
+          "type": "builtin_question_type",
+          "named": true
+        },
+        {
           "type": "constructor",
           "named": true
         },
@@ -3327,6 +3917,10 @@
         },
         {
           "type": "list_type",
+          "named": true
+        },
+        {
+          "type": "question_type",
           "named": true
         },
         {
@@ -3352,9 +3946,28 @@
         {
           "type": "uniqueness_type",
           "named": true
+        },
+        {
+          "type": "unit_type",
+          "named": true
         }
       ]
     }
+  },
+  {
+    "type": "unit_expression",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "unit_pattern",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "unit_type",
+    "named": true,
+    "fields": {}
   },
   {
     "type": "update_field",
@@ -3666,12 +4279,20 @@
     "named": true
   },
   {
+    "type": "question_marker",
+    "named": true
+  },
+  {
     "type": "range_operator",
     "named": true
   },
   {
     "type": "special",
     "named": false
+  },
+  {
+    "type": "strict_equal",
+    "named": true
   },
   {
     "type": "string",
