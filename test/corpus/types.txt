@@ -71,9 +71,10 @@ instance Show Int where
     name: (instance_class
       (constructor))
     argument: (constructor)
-    (function_declaration
-      name: (identifier)
-      pattern: (identifier)
-      body: (application
-        function: (identifier)
-        argument: (identifier)))))
+    (instance_member
+      (function_declaration
+        name: (identifier)
+        pattern: (identifier)
+        body: (application
+          function: (identifier)
+          argument: (identifier))))))

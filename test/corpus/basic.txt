@@ -202,14 +202,11 @@ f = \x -> x
 (source_file
   (function_declaration
     name: (identifier)
-    body: (binary_expression
-      (unary_expression
-        operator: (operator)
-        (identifier))
-      operator: (operator_add)
-      (unary_expression
-        operator: (operator)
-        (identifier)))))
+    body: (lambda_expression
+      (lambda_start)
+      parameter: (identifier)
+      (arrow)
+      body: (identifier))))
 
 ==================
 Lambda Multi-arg
@@ -220,19 +217,90 @@ f = \x y -> x + y
 (source_file
   (function_declaration
     name: (identifier)
-    body: (binary_expression
-      (binary_expression
-        (unary_expression
-          operator: (operator)
-          (application
-            function: (identifier)
-            argument: (identifier)))
+    body: (lambda_expression
+      (lambda_start)
+      parameter: (identifier)
+      parameter: (identifier)
+      (arrow)
+      body: (binary_expression
+        (identifier)
         operator: (operator_add)
-        (unary_expression
-          operator: (operator)
-          (identifier)))
-      operator: (operator_add)
-      (identifier))))
+        (identifier)))))
+
+==================
+Lambda with Pattern Parameter
+==================
+f = \ (Just x) -> x
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    body: (lambda_expression
+      (lambda_start)
+      parameter: (paren_pattern
+        (constructor_pattern
+          constructor: (constructor)
+          argument: (identifier)))
+      (arrow)
+      body: (identifier))))
+
+==================
+Lambda with Equals Separator
+==================
+f = \x = x + 1
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    body: (lambda_expression
+      (lambda_start)
+      parameter: (identifier)
+      body: (binary_expression
+        (identifier)
+        operator: (operator_add)
+        (number
+          (integer))))))
+
+==================
+Nested Lambda
+==================
+f = \x -> \y -> x
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    body: (lambda_expression
+      (lambda_start)
+      parameter: (identifier)
+      (arrow)
+      body: (lambda_expression
+        (lambda_start)
+        parameter: (identifier)
+        (arrow)
+        body: (identifier)))))
+
+==================
+Lambda as Argument
+==================
+f = map (\x -> x) xs
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    body: (application
+      function: (application
+        function: (identifier)
+        argument: (paren_expression
+          (lambda_expression
+            (lambda_start)
+            parameter: (identifier)
+            (arrow)
+            body: (identifier))))
+      argument: (identifier))))
 
 ==================
 Case with Guard

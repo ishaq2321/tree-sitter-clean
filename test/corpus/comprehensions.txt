@@ -16,13 +16,10 @@ f xs = [x * 2 \\ x <- xs]
           (integer)))
       (comprehension_sep)
       (comprehension_qualifier
-        (guard
-          condition: (binary_expression
-            (identifier)
-            operator: (operator_compare)
-            (unary_expression
-              operator: (operator)
-              (identifier))))))))
+        (generator
+          pattern: (identifier)
+          (generator_sep)
+          expression: (identifier))))))
 
 ==================
 Comprehension with Let
@@ -38,13 +35,10 @@ f xs = [y \\ x <- xs, let y = x + 1]
       body: (identifier)
       (comprehension_sep)
       (comprehension_qualifier
-        (guard
-          condition: (binary_expression
-            (identifier)
-            operator: (operator_compare)
-            (unary_expression
-              operator: (operator)
-              (identifier)))))
+        (generator
+          pattern: (identifier)
+          (generator_sep)
+          expression: (identifier)))
       (comprehension_qualifier
         (let_qualifier
           name: (identifier)
@@ -53,3 +47,54 @@ f xs = [y \\ x <- xs, let y = x + 1]
             operator: (operator_add)
             (number
               (integer))))))))
+
+==================
+Comprehension with Guard
+==================
+f xs = [x \\ x <- xs, isEven x]
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    pattern: (identifier)
+    body: (list_comprehension
+      body: (identifier)
+      (comprehension_sep)
+      (comprehension_qualifier
+        (generator
+          pattern: (identifier)
+          (generator_sep)
+          expression: (identifier)))
+      (comprehension_qualifier
+        (guard
+          condition: (application
+            function: (identifier)
+            argument: (identifier)))))))
+
+==================
+Parallel Comprehension
+==================
+f xs ys = [(x, y) \\ x <- xs & y <- ys]
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    pattern: (identifier)
+    pattern: (identifier)
+    body: (list_comprehension
+      body: (tuple_expression
+        (identifier)
+        (identifier))
+      (comprehension_sep)
+      (comprehension_qualifier
+        (generator
+          pattern: (identifier)
+          (generator_sep)
+          expression: (identifier)))
+      (comprehension_qualifier
+        (generator
+          pattern: (identifier)
+          (generator_sep)
+          expression: (identifier))))))
