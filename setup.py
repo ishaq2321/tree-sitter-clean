@@ -34,7 +34,7 @@ class BdistWheel(bdist_wheel):
 
 setup(
     name="tree-sitter-clean",
-    version="1.1.0",
+    version="1.2.0",
     description="Clean grammar for tree-sitter",
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/markdown",
