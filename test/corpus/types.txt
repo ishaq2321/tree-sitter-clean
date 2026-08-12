@@ -32,12 +32,13 @@ ADT with Multiple Parameters
     parameter: (type_variable
       (identifier))
     body: (type_definition_body
-      rhs: (type_application
-        (constructor)
-        (type_variable
-          (identifier))
-        (type_variable
-          (identifier))))))
+      rhs: (data_constructors
+        (data_constructor
+          name: (constructor)
+          argument: (type_variable
+            (identifier))
+          argument: (type_variable
+            (identifier)))))))
 
 ==================
 ADT with Records

@@ -62,6 +62,10 @@ typedef struct {
   uint16_t dedent_target;                  /* column of the current dedent */
   bool dedenting;                          /* mid multi-level dedent chain */
   bool pending_block;                      /* block opened mid-line, level deferred */
+  bool pending_inline;                     /* the deferred block is a where/with
+                                              (INLINE kind), not a special block */
+  uint32_t dedent_pos;                     /* byte offset where the dedent chain
+                                              landed; step 4b only fires there */
 } Scanner;
 
 /* What kind of construct opened a layout level. A guard bar `|` at the level
@@ -95,6 +99,8 @@ static void scanner_init(Scanner *s) {
   s->dedent_target = 0;
   s->dedenting = false;
   s->pending_block = false;
+  s->pending_inline = false;
+  s->dedent_pos = 0;
 }
 
 void *tree_sitter_clean_external_scanner_create(void) {
@@ -109,15 +115,16 @@ void tree_sitter_clean_external_scanner_destroy(void *payload) {
 
 /* The serialized payload is the indent stack, then the level kinds (one byte
  * per level), then the dedent-chain state: 1 byte for `dedenting`, the 2-byte
- * `dedent_target`, and 1 byte for `pending_block`. (The stack is at most
- * MAX_INDENT_STACK * 3 = 300 bytes, well under the buffer size.) */
+ * `dedent_target`, 1 byte for `pending_block`, and the 4-byte `dedent_pos`.
+ * (The stack is at most MAX_INDENT_STACK * 3 = 300 bytes, well under the
+ * buffer size.) */
 unsigned tree_sitter_clean_external_scanner_serialize(void *payload,
                                                      char *buffer) {
   Scanner *s = (Scanner *)payload;
   size_t stack_bytes = s->indent_size * sizeof(uint16_t);
   size_t kind_bytes = s->indent_size * sizeof(uint8_t);
-  if (stack_bytes + kind_bytes + 4 > TREE_SITTER_SERIALIZATION_BUFFER_SIZE) {
-    size_t room = TREE_SITTER_SERIALIZATION_BUFFER_SIZE - 4;
+  if (stack_bytes + kind_bytes + 8 > TREE_SITTER_SERIALIZATION_BUFFER_SIZE) {
+    size_t room = TREE_SITTER_SERIALIZATION_BUFFER_SIZE - 8;
     stack_bytes = (room * sizeof(uint16_t)) / (sizeof(uint16_t) + sizeof(uint8_t));
     kind_bytes = (stack_bytes * sizeof(uint8_t)) / sizeof(uint16_t);
   }
@@ -127,20 +134,22 @@ unsigned tree_sitter_clean_external_scanner_serialize(void *payload,
   tail[0] = s->dedenting ? 1 : 0;
   memcpy(tail + 1, &s->dedent_target, sizeof(uint16_t));
   tail[3] = s->pending_block ? 1 : 0;
-  return (unsigned)(stack_bytes + kind_bytes + 4);
+  tail[4] = s->pending_inline ? 1 : 0;
+  memcpy(tail + 5, &s->dedent_pos, sizeof(uint32_t));
+  return (unsigned)(stack_bytes + kind_bytes + 9);
 }
 
 void tree_sitter_clean_external_scanner_deserialize(void *payload,
                                                     const char *buffer,
                                                     unsigned length) {
   Scanner *s = (Scanner *)payload;
-  if (length < 4) {
+  if (length < 9) {
     scanner_init(s);
     return;
   }
   /* Recompute the split between stack bytes and kind bytes (both grow with
    * the level count; the serialized layout is stack bytes first). */
-  size_t total = length - 4;
+  size_t total = length - 9;
   size_t n = total / (sizeof(uint16_t) + sizeof(uint8_t));
   if (n > MAX_INDENT_STACK) {
     n = MAX_INDENT_STACK;
@@ -149,9 +158,11 @@ void tree_sitter_clean_external_scanner_deserialize(void *payload,
   memcpy(s->indent_stack, buffer, stack_bytes);
   memcpy(s->level_kind, buffer + stack_bytes, n * sizeof(uint8_t));
   s->indent_size = (uint32_t)n;
-  s->dedenting = buffer[length - 4] != 0;
-  memcpy(&s->dedent_target, buffer + length - 3, sizeof(uint16_t));
-  s->pending_block = buffer[length - 1] != 0;
+  s->dedenting = buffer[length - 9] != 0;
+  memcpy(&s->dedent_target, buffer + length - 8, sizeof(uint16_t));
+  s->pending_block = buffer[length - 6] != 0;
+  s->pending_inline = buffer[length - 5] != 0;
+  memcpy(&s->dedent_pos, buffer + length - 4, sizeof(uint32_t));
 }
 
 /* ---------- helpers ---------------------------------------------------- */
@@ -264,8 +275,7 @@ static bool is_where_or_with_keyword(TSLexer *lexer) {
 
 /* ---------- main scan entry -------------------------------------------- */
 
-bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer,
-                                             const bool *valid_symbols) {
+static bool scan_impl(void *payload, TSLexer *lexer, const bool *valid_symbols) {
   Scanner *s = (Scanner *)payload;
 
   /* 1) Nested block comments are checked first so a comment never disturbs
@@ -346,14 +356,45 @@ bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer,
    * the normal logic emits the separator/end for the enclosing context. */
   if (s->pending_block) {
     s->pending_block = false;
+    /* Read and clear both flags up front: a pushed level (the early return
+     * below) must not leave `pending_inline` set, or a later `special`
+     * deferral would wrongly inherit INLINE kind. */
+    bool inline_kind = s->pending_inline;
+    s->pending_inline = false;
     if (crossed_newline && want_semi && col > current) {
       if (s->indent_size < MAX_INDENT_STACK) {
         s->indent_stack[s->indent_size] = (uint16_t)col;
-        s->level_kind[s->indent_size] = LEVEL_KIND_START;
+        /* A deferred `where`/`with` block hosts declarations whose own
+         * guards/let-before bindings continue at the block's column — that
+         * is the INLINE behaviour. A deferred `special` block has no such
+         * members, so START is fine there. */
+        s->level_kind[s->indent_size] =
+            inline_kind ? LEVEL_KIND_INLINE : LEVEL_KIND_START;
         s->indent_size++;
       }
       lexer->mark_end(lexer);
       lexer->result_symbol = LAYOUT_SEMICOLON;
+      return true;
+    }
+    /* The deferred block did NOT continue on the next line (its only member
+     * was the inline one, e.g. `... = b with (ys,zs) = span p xs` followed
+     * by a dedent). No level was pushed, so step 4 has nothing to pop — and
+     * worse, a same-column line (typically the ROOT column, 0) would hit
+     * step 7 and emit a sibling SEMICOLON, letting the next top-level
+     * declaration silently join the block as a member. Close the block
+     * here: emit the missing LAYOUT_END. The re-request at this position
+     * arrives at the SAME byte offset (the token is zero-width), so no
+     * newline is crossed and step 7's same-column logic cannot fire for it.
+     * Record the dedent chain (target = this line's column) so step 4b
+     * emits the sibling separator at exactly this position — the chain
+     * drains to a same-column target and fires there instead of at later,
+     * mid-line positions. */
+    if (crossed_newline && want_end && col <= current) {
+      s->dedent_target = col;
+      s->dedenting = true;
+      s->dedent_pos = lexer->get_column(lexer);
+      lexer->mark_end(lexer);
+      lexer->result_symbol = LAYOUT_END;
       return true;
     }
   }
@@ -400,6 +441,13 @@ bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer,
     if (s->indent_size > 1) {
       s->indent_size--;
     }
+    /* Remember where the chain landed (the first token of the dedented
+     * line). tree-sitter restores the scanner state after every failed
+     * scan, so `dedenting` alone would let step 4b re-fire at LATER,
+     * mid-line positions (e.g. the argument of a binding's value
+     * expression) and spuriously emit a sibling separator there. Only the
+     * position where the chain drained may receive that separator. */
+    s->dedent_pos = lexer->get_column(lexer);
     lexer->mark_end(lexer);
     lexer->result_symbol = LAYOUT_END;
     return true;
@@ -414,6 +462,17 @@ bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer,
    *     separated only at guard-block levels (it starts a NEW member); at a
    *     where/with member level it continues the current function's guards. */
   if (s->dedenting) {
+    /* Only the position where the chain drained may receive the sibling
+     * separator; later positions (mid-line, inside a body expression, or on
+     * subsequent lines) are past the chain and must fall through to the
+     * normal block-start/separator logic — a guard's nested block needs
+     * `_layout_start` at exactly this point. The `dedenting` flag is
+     * resurrected by state rollback on failed scans, so this check is what
+     * keeps 4b from firing everywhere. */
+    if (lexer->get_column(lexer) != s->dedent_pos) {
+      s->dedenting = false;
+      goto past_dedent;
+    }
     s->dedenting = false;
     bool skip_sep = false;
     if (lexer->lookahead == 'w') {
@@ -431,7 +490,7 @@ bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer,
       return false;
     }
     skip_sep =
-        (lexer->lookahead == '=' &&
+        ((lexer->lookahead == '=' || lexer->lookahead == '#') &&
          (s->indent_size == 1 ||
           s->level_kind[s->indent_size - 1] == LEVEL_KIND_INLINE)) ||
         (lexer->lookahead == '|' &&
@@ -444,6 +503,7 @@ bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer,
     }
   }
 
+past_dedent:
   /* 5) If we did not cross a newline, the only layout decisions left are
    *    block starts on the current line. A `where`/`with` opening mid-line
    *    (`... with (ys,zs) = span p xs`) holds only the binding on the
@@ -453,6 +513,15 @@ bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer,
    *    defers: see step 2b — the level is established at the next line's
    *    column if it is deeper, so continuation members join the block. */
   if (!crossed_newline) {
+    /* Explicit brace layout: `where { ... }` (class/instance members). The
+     * members are separated by literal `;` and closed by `}`, so NO layout
+     * token is wanted — the parser consumes `{` directly. Emitting a
+     * zero-width INLINE_START here would let the layout alternative grab
+     * the token and then fail on `{`, with no GLR fork left to take the
+     * brace path. */
+    if (lexer->lookahead == '{' && (want_start || want_inline)) {
+      return false;
+    }
     /* A mid-line block start with BOTH `_layout_start` and
      * `_inline_layout_start` valid is a `special` block whose first member
      * is inline (`special a=Int`): the continuation members sit on deeper
@@ -469,23 +538,28 @@ bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer,
       return true;
     }
     if (want_inline) {
-      /* A genuine `where`/`with` block-open (e.g. `... = b with (ys,zs) =
-       * span p xs`) wants ONLY _inline_layout_start after the keyword, and
-       * pushes a real INLINE level. The error-recovery state instead wants
-       * every token at once (want_semi/start/inline/end all true) and may
-       * sit at one position for many requests; those get a PHANTOM level —
-       * the push keeps the serialized state changing so the runtime accepts
-       * and skips the empty token (mirroring the pre-drain scanner), while
-       * the dedent later collapses all phantoms in one token instead of
-       * draining one LAYOUT_END per bogus level. */
-      if (s->indent_size < MAX_INDENT_STACK) {
-        s->indent_stack[s->indent_size] =
-            (want_semi || want_start || want_end) ? PHANTOM_BLOCK_LEVEL
-                                                  : INLINE_BLOCK_LEVEL;
-        s->level_kind[s->indent_size] =
-            (want_semi || want_start || want_end) ? LEVEL_KIND_START
-                                                  : LEVEL_KIND_INLINE;
-        s->indent_size++;
+      /* A genuine `where`/`with` block-open (`... = b with (ys,zs) =
+       * span p xs`, or `where _from_by_to :: ...` with continuation members
+       * on deeper lines) wants ONLY _inline_layout_start after the keyword.
+       * The first member sits on the keyword's own line; whether later lines
+       * CONTINUE the block (deeper column) or close it is decided at the
+       * next line (step 2b), so defer like `special` blocks instead of
+       * pushing a sentinel. The error-recovery state instead wants every
+       * token at once (want_semi/start/inline/end all true) and may sit at
+       * one position for many requests; those get a PHANTOM level — the push
+       * keeps the serialized state changing so the runtime accepts and skips
+       * the empty token (mirroring the pre-drain scanner), while the dedent
+       * later collapses all phantoms in one token instead of draining one
+       * LAYOUT_END per bogus level. */
+      if (want_semi || want_start || want_end) {
+        if (s->indent_size < MAX_INDENT_STACK) {
+          s->indent_stack[s->indent_size] = PHANTOM_BLOCK_LEVEL;
+          s->level_kind[s->indent_size] = LEVEL_KIND_START;
+          s->indent_size++;
+        }
+      } else {
+        s->pending_block = true;
+        s->pending_inline = true;
       }
       lexer->mark_end(lexer);
       lexer->result_symbol = LAYOUT_INLINE_START;
@@ -530,14 +604,15 @@ bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer,
       lexer->result_symbol = LAYOUT_SEMICOLON; /* zero-width at word start */
       return true;
     }
-    /* A `=` at a same-column line start continues the CURRENT declaration
-     * when no block member is possible — at the root (`f x` on one line,
-     * `= code { ... }` on the next) or at a where/with member level. At a
-     * guard/case/let block level (LEVEL_KIND_START) the `=` begins a NEW
-     * member and MUST get the separator. No declaration can begin with `=`.
+    /* A `=` or `#` at a same-column line start continues the CURRENT
+     * declaration when no block member is possible — at the root (`f x` on
+     * one line, `= code { ... }` on the next, or `# (a,b) = ...` let-before
+     * bindings) or at a where/with member level. At a guard/case/let block
+     * level (LEVEL_KIND_START) they begin a NEW member and MUST get the
+     * separator. No declaration can begin with `=` or `#`.
      */
     bool skip_sep =
-        (lexer->lookahead == '=' &&
+        ((lexer->lookahead == '=' || lexer->lookahead == '#') &&
          (s->indent_size == 1 ||
           s->level_kind[s->indent_size - 1] == LEVEL_KIND_INLINE)) ||
         (lexer->lookahead == '|' &&
@@ -550,4 +625,9 @@ bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer,
   }
 
   return false;
+}
+
+bool tree_sitter_clean_external_scanner_scan(void *payload, TSLexer *lexer,
+                                             const bool *valid_symbols) {
+  return scan_impl(payload, lexer, valid_symbols);
 }

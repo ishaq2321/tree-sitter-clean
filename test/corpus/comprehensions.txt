@@ -11,7 +11,7 @@ f xs = [x * 2 \\ x <- xs]
     body: (list_comprehension
       body: (binary_expression
         (identifier)
-        operator: (operator_mul)
+        operator: (uniqueness_star)
         (number
           (integer)))
       (comprehension_sep)
