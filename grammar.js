@@ -323,7 +323,11 @@ module.exports = grammar({
           choice($.identifier, $.constructor, $._operator_symbol),
           // `class ==(..)` — the all-members suffix. `(..)` lexes as a single
           // parenthesized_operator token, so the suffix must accept it whole.
-          optional($.parenthesized_operator),
+          // `class zero(zero)` — the exported method name, parenthesised so
+          // operator methods fit (`class < (<)`); plain method names use the
+          // dedicated class_method_name rule (isolated so its `(` shift does
+          // not merge with the shared parenthesized_name states).
+          optional(choice($.parenthesized_operator, $.class_method_name)),
         ),
         seq(
           "instance",
@@ -384,6 +388,10 @@ module.exports = grammar({
         field("type", $._type),
         field("context", optional($.class_context)),
         optional($.uniqueness_constraints),
+        // Specialisation pragmas: `f :: ... | C a special { a=Int };` — the
+        // stdlib's definition modules request specialised instances this way,
+        // with the block (layout or brace form) trailing the class context.
+        optional($.special_block),
         // Inline body: `fwriter :: !Real !*File -> *File :== code { ... }` —
         // stdlib signatures frequently carry an inline ABC-code definition.
         optional(seq(":==", field("body", $._expression))),
@@ -395,6 +403,11 @@ module.exports = grammar({
         optional(";"),
         ),
       ),
+
+    // `(zero)` — a method name in a class import, isolated from the shared
+    // parenthesized_name rule so its `(` shift cannot pollute unrelated
+    // states (instance heads, signature names).
+    class_method_name: ($) => seq("(", $.identifier, ")"),
 
     // `, [u <= v, u <= w]` — uniqueness constraints that follow a signature.
     // The left side may be a full type (`[w u <= v]` — a uniqueness variable
@@ -845,10 +858,20 @@ module.exports = grammar({
     // the continuation lines without confusing `let`/`case` (start-only) or
     // `where`/`with` (inline-only).
     special_block: ($) =>
-      seq(
-        "special",
-        optional(choice($._layout_start, $._inline_layout_start)),
-        layoutBlockMembers($, $.special_member),
+      choice(
+        // Brace form: `special { a=Int; b=Char; }` — the members are
+        // separated by literal `;` and closed by `}` (the stdlib's
+        // `_SystemEnumStrict.dcl` uses this shape for every specialisation
+        // pragma). The scanner returns no layout token when `{` follows the
+        // keyword, so only the brace path can consume it.
+        seq("special", bracedBlockMembers($, $.special_member)),
+        // Layout form: `special a=Int` with continuation members on deeper
+        // lines (scanner step 2b).
+        seq(
+          "special",
+          optional(choice($._layout_start, $._inline_layout_start)),
+          layoutBlockMembers($, $.special_member),
+        ),
       ),
 
     // A member binds one type variable (`a=Int`) or several, comma-separated

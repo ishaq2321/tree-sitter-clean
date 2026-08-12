@@ -121,16 +121,16 @@ isMember :: a -> Bool | Eq a
     context: (class_context
       (constructor)
       (type_variable
-        (identifier))))
-  (special_block
-    (special_member
-      variable: (type_variable
-        (identifier))
-      type: (constructor))
-    (special_member
-      variable: (type_variable
-        (identifier))
-      type: (constructor))))
+        (identifier)))
+    (special_block
+      (special_member
+        variable: (type_variable
+          (identifier))
+        type: (constructor))
+      (special_member
+        variable: (type_variable
+          (identifier))
+        type: (constructor)))))
 
 ==================
 Special Pragmas (block form)
@@ -156,13 +156,72 @@ sort :: [a] -> [a] | Ord a
     context: (class_context
       (constructor)
       (type_variable
-        (identifier))))
-  (special_block
-    (special_member
-      variable: (type_variable
+        (identifier)))
+    (special_block
+      (special_member
+        variable: (type_variable
+          (identifier))
+        type: (constructor))
+      (special_member
+        variable: (type_variable
+          (identifier))
+        type: (constructor)))))
+
+==================
+Special Pragmas (brace form) & class method imports
+==================
+from StdClass import class zero(zero), class < (<);
+_from_o :: a -> .(l a) | IncDec a & List l a
+	special {
+		l=[],a=Int;
+		l=[!],a=Int;
+	};
+---
+
+(source_file
+  (import_declaration
+    module: (module_name
+      (module_identifier))
+    (identifier)
+    (class_method_name
+      (identifier))
+    (operator_compare)
+    (parenthesized_operator))
+  (type_signature
+    name: (signature_name
+      (identifier))
+    type: (type_function
+      (type_variable
         (identifier))
-      type: (constructor))
-    (special_member
-      variable: (type_variable
+      (arrow)
+      (dotted_type
+        (type_paren
+          (type_application
+            (type_variable
+              (identifier))
+            (type_variable
+              (identifier))))))
+    context: (class_context
+      (constructor)
+      (type_variable
         (identifier))
-      type: (constructor))))
+      (constructor)
+      (type_variable
+        (identifier))
+      (type_variable
+        (identifier)))
+    (special_block
+      (special_member
+        variable: (type_variable
+          (identifier))
+        type: (list_type)
+        variable: (type_variable
+          (identifier))
+        type: (constructor))
+      (special_member
+        variable: (type_variable
+          (identifier))
+        type: (list_type)
+        variable: (type_variable
+          (identifier))
+        type: (constructor)))))
