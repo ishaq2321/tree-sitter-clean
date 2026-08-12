@@ -336,6 +336,13 @@ module.exports = grammar({
           // and the type it is instantiated for (possibly parenthesised)
           optional($._type_atom),
         ),
+        // `generic JSONEncode` — the generic function itself, imported to
+        // derive instances for it (`from Text.GenJSON import generic
+        // JSONEncode, generic JSONDecode, :: JSONNode`).
+        seq(
+          "generic",
+          choice($.identifier, $.constructor, $._operator_symbol),
+        ),
       ),
 
     // ─────────────────────────────────────────────────────────────────────
@@ -555,9 +562,26 @@ module.exports = grammar({
         // Pathname Bool Bool *GeneralSt` — data_constructors would stop at
         // `Pathname Bool Bool` and leave `*GeneralSt` dangling.)
         seq(choice(":==", "=:"), field("rhs", $._type)),
+        // `:: X = E.a: { ... }` — an EXISTENTIAL type: the `E.a:` quantifier
+        // introduces a type variable `a` scoped over the RHS (records and
+        // ADTs, e.g. `:: DynamicTemp = E.a: { value :: a, type :: TypeCode }`
+        // in _SystemDynamic.dcl). `E` lexes as a constructor, but the
+        // existential form is the only one where a `.` immediately follows,
+        // so the longer-match rule separates it from a plain `E` constructor.
+        seq(
+          "=",
+          "E",
+          ".",
+          field("existential", $.type_variable),
+          ":",
+          field("rhs", choice($.data_constructors, $.record_definition)),
+        ),
         // `:: X = Cons a | Nil` / `:: X = { field :: Int }` — ADTs and
         // records
         seq("=", field("rhs", choice($.data_constructors, $.record_definition))),
+        // `:: X = !{ field :: Int }` — a strict record (all fields strict by
+        // default), e.g. `:: StartedCodeGenerator = !{ ... }` in PmCleanSystem.
+        seq("=", "!", field("rhs", $.record_definition)),
       ),
 
     type_variable: ($) => $.identifier,
@@ -641,6 +665,21 @@ module.exports = grammar({
         $.unit_type,
         $.question_type,
         $.builtin_question_type,
+        $.generic_kind_type,
+      ),
+
+    // `{|*|}` — the generic kind applied to a class in a context head
+    // (`| JSONEncode{|*|} a`): the type-constructor kind, written with a
+    // `*` (the product/tuple constructor, lexed as operator_mul) or a
+    // constructor/variable (`{|PAIR|}`, `{|c|}`). Same shape as the
+    // generic_case_definition kind selector.
+    generic_kind_type: ($) =>
+      seq(
+        "{",
+        $._pipe,
+        choice($.type_variable, $.constructor, $.operator_mul),
+        $._pipe,
+        "}",
       ),
 
     // `?x`, `?^x`, `?#x` — Clean's builtin strictness types (`?` = strict,
@@ -1764,6 +1803,10 @@ module.exports = grammar({
     // A constructor is an identifier beginning with an uppercase letter.
     // Declared before `identifier` so the more-specific rule wins. Trailing
     // backticks are allowed in Clean identifiers (`xs``, like Haskell primes).
+    // NOTE: `_`-prefixed constructors (`_TypeFixedVar`) are NOT matched here —
+    // adding `_[A-Z]` pushes the generated action table past 65536 entries
+    // (silent table corruption; see GRAMMAR-GAPS.md). They lex as identifiers,
+    // which is the pre-existing accepted behaviour.
     constructor: ($) => /[A-Z][a-zA-Z0-9_'`]*/,
 
     identifier: ($) => /[a-z_][a-zA-Z0-9_'`]*/,

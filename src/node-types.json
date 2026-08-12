@@ -290,6 +290,10 @@
         "named": true
       },
       {
+        "type": "generic_kind_type",
+        "named": true
+      },
+      {
         "type": "list_type",
         "named": true
       },
@@ -816,6 +820,10 @@
           "named": true
         },
         {
+          "type": "generic_kind_type",
+          "named": true
+        },
+        {
           "type": "identifier",
           "named": true
         },
@@ -1235,6 +1243,10 @@
             "named": true
           },
           {
+            "type": "generic_kind_type",
+            "named": true
+          },
+          {
             "type": "list_type",
             "named": true
           },
@@ -1335,6 +1347,10 @@
           "named": true
         },
         {
+          "type": "generic_kind_type",
+          "named": true
+        },
+        {
           "type": "list_type",
           "named": true
         },
@@ -1399,6 +1415,10 @@
         },
         {
           "type": "dotted_type",
+          "named": true
+        },
+        {
+          "type": "generic_kind_type",
           "named": true
         },
         {
@@ -1912,6 +1932,29 @@
     }
   },
   {
+    "type": "generic_kind_type",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "constructor",
+          "named": true
+        },
+        {
+          "type": "operator_mul",
+          "named": true
+        },
+        {
+          "type": "type_variable",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "guard",
     "named": true,
     "fields": {
@@ -2100,6 +2143,10 @@
         },
         {
           "type": "dotted_type",
+          "named": true
+        },
+        {
+          "type": "generic_kind_type",
           "named": true
         },
         {
@@ -2400,6 +2447,10 @@
           },
           {
             "type": "dotted_type",
+            "named": true
+          },
+          {
+            "type": "generic_kind_type",
             "named": true
           },
           {
@@ -3131,6 +3182,10 @@
           "named": true
         },
         {
+          "type": "generic_kind_type",
+          "named": true
+        },
+        {
           "type": "list_type",
           "named": true
         },
@@ -3423,6 +3478,10 @@
             "named": true
           },
           {
+            "type": "generic_kind_type",
+            "named": true
+          },
+          {
             "type": "list_type",
             "named": true
           },
@@ -3528,6 +3587,10 @@
         },
         {
           "type": "dotted_type",
+          "named": true
+        },
+        {
+          "type": "generic_kind_type",
           "named": true
         },
         {
@@ -3639,6 +3702,10 @@
           "named": true
         },
         {
+          "type": "generic_kind_type",
+          "named": true
+        },
+        {
           "type": "list_type",
           "named": true
         },
@@ -3717,6 +3784,16 @@
     "type": "type_definition_body",
     "named": true,
     "fields": {
+      "existential": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "type_variable",
+            "named": true
+          }
+        ]
+      },
       "rhs": {
         "multiple": false,
         "required": true,
@@ -4029,6 +4106,10 @@
           "named": true
         },
         {
+          "type": "generic_kind_type",
+          "named": true
+        },
+        {
           "type": "identifier",
           "named": true
         },
@@ -4112,6 +4193,10 @@
         },
         {
           "type": "dotted_type",
+          "named": true
+        },
+        {
+          "type": "generic_kind_type",
           "named": true
         },
         {
@@ -4291,6 +4376,10 @@
   },
   {
     "type": "=:",
+    "named": false
+  },
+  {
+    "type": "E",
     "named": false
   },
   {

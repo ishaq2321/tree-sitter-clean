@@ -14,9 +14,34 @@ a whole-file `ERROR` wrapper where the file previously parsed with local
 errors. Every rejected approach below was rejected for exactly this reason,
 measured on the full suite, not on isolated probes.
 
-The current verified baseline (commit `fc474e4`): **1871 ERROR nodes across
-120 files vs 5129 at the pre-overhaul commit**; core stdlib (StdEnv /
-StdList / StdString / StdMaybe) at 0/0; corpus 50/50; throughput ~1.5× HEAD.
+The current verified baseline: **1833 ERROR nodes across 120 .icl files
+vs 5129 at the pre-overhaul commit** (and 13 across 119 .dcl files, down
+from 282); core stdlib (StdEnv / StdList / StdString / StdMaybe) at 0/0;
+corpus 51/51; throughput ~1.15× HEAD.
+
+## Root cause: the 65536-entry action-table limit
+
+Every "fragile equilibrium" regression below has the same *mechanism*:
+the generated `src/parser.c` encodes action ids in 16-bit fields, so any
+change that grows the LALR automaton past **65536 actions** silently
+corrupts the table. The symptom is not a build error — `tree-sitter
+generate` still exits 0 and `cc` succeeds with hundreds of
+`unsigned conversion from 'int' to 'short unsigned int' changes value
+from '65536' to '0' [-Woverflow]` warnings — but every file, even
+`module t`, wraps in a top-level ERROR.
+
+**Verified trigger:** extending the `constructor` token to accept
+`_`-prefixed names (`/_[A-Z][a-zA-Z0-9_'`]*/`, `_TypeFixedVar` in
+`_SystemDynamic.dcl` is otherwise a genuine gap) produced **349 overflow
+warnings** and broke every file in the suite. Reverting restored 0
+warnings and the 1833 baseline exactly.
+
+This means the grammar is near a hard tree-sitter generator ceiling, and
+it is the reason token-level fixes (`!!`, `=:`, continuation bindings,
+`_`-constructors) keep failing *globally* rather than locally. Closing
+gaps from here requires either reducing the automaton elsewhere to buy
+headroom, or migrating to a tree-sitter version that widens the action
+encoding — not adding more tokens.
 
 ---
 
@@ -138,9 +163,11 @@ same walls.
 
 When experimenting, ALWAYS re-measure the full 120-file suite
 (`bash /tmp/regress2.sh <mine.so> <head.so>`) and compare against the
-committed baseline (**1871**). A construct that parses in isolation but
-moves the suite total up is a regression, not a fix. The head reference
-parser can be rebuilt with:
+committed baseline (**1833**). A construct that parses in isolation but
+moves the suite total up is a regression, not a fix. Also check for the
+overflow corruption above: `cc ... 2>&1 | grep -c overflow` must be **0**
+before trusting any measurement. The head reference parser can be rebuilt
+with:
 
 ```bash
 git worktree add /tmp/ts-head HEAD

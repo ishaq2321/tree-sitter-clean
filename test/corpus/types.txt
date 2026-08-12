@@ -225,3 +225,96 @@ _from_o :: a -> .(l a) | IncDec a & List l a
         variable: (type_variable
           (identifier))
         type: (constructor)))))
+
+==================
+Existential Types
+==================
+:: DynamicTemp = E.a: { value :: a, type :: TypeCode }
+---
+
+(source_file
+  (type_definition
+    name: (constructor)
+    body: (type_definition_body
+      existential: (type_variable
+        (identifier))
+      rhs: (record_definition
+        (record_field
+          name: (identifier)
+          type: (type_variable
+            (identifier)))
+        (record_field
+          name: (identifier)
+          type: (constructor))))))
+
+==================
+Strict Record
+==================
+:: Started = !{ abc :: !{#Char} }
+---
+
+(source_file
+  (type_definition
+    name: (constructor)
+    body: (type_definition_body
+      rhs: (record_definition
+        (record_field
+          name: (identifier)
+          type: (strict_type
+            (array_type
+              (constructor))))))))
+
+==================
+Generic Kind in Context
+==================
+readCache :: !a !*World -> (!Maybe b, !*World) | toString a & JSONDecode{|*|} b
+---
+
+(source_file
+  (type_signature
+    name: (signature_name
+      (identifier))
+    type: (type_function
+      (type_application
+        (strict_type
+          (type_variable
+            (identifier)))
+        (strict_type
+          (uniqueness_type
+            (uniqueness_star)
+            (constructor))))
+      (arrow)
+      (tuple_type
+        (type_application
+          (strict_type
+            (constructor))
+          (type_variable
+            (identifier)))
+        (strict_type
+          (uniqueness_type
+            (uniqueness_star)
+            (constructor)))))
+    context: (class_context
+      (identifier)
+      (type_variable
+        (identifier))
+      (constructor)
+      (generic_kind_type
+        (operator_mul))
+      (type_variable
+        (identifier)))))
+
+==================
+Generic Import
+==================
+from Text.GenJSON import generic JSONEncode, generic JSONDecode, :: JSONNode
+---
+
+(source_file
+  (import_declaration
+    module: (module_name
+      (module_identifier)
+      (module_identifier))
+    (constructor)
+    (constructor)
+    (constructor)))
