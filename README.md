@@ -22,6 +22,12 @@ Clean grammar for [tree-sitter][].
 - Comprehensions (list comprehensions with generators, guards, let qualifiers)
 - Records (construction, update, field access)
 
+### Known Gaps
+
+Clean constructs the grammar does not (fully) parse yet — strict-cons
+patterns aside — are documented in [GRAMMAR-GAPS.md](GRAMMAR-GAPS.md),
+along with the approaches that were tried and rejected on the full corpus.
+
 ### Node Types
 
 The grammar produces **69 named node types** for precise AST analysis, including:
