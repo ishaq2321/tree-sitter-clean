@@ -30,6 +30,12 @@ class BdistWheel(bdist_wheel):
         python, abi, platform = super().get_tag()
         if python.startswith("cp"):
             python, abi = "cp310", "abi3"
+        # PyPI rejects the raw `linux_x86_64` platform tag — wheels must be
+        # manylinux-tagged. The GitHub Actions ubuntu-24.04 runner ships
+        # glibc 2.39, so claim the highest manylinux floor that the build
+        # actually satisfies (a lower floor would break on older glibc).
+        if platform == "linux_x86_64":
+            platform = "manylinux_2_39_x86_64"
         return python, abi, platform
 
 setup(
