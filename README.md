@@ -5,6 +5,7 @@
 [![matrix][matrix]](https://matrix.to/#/#tree-sitter-chat:matrix.org)
 [![npm][npm]](https://www.npmjs.com/package/tree-sitter-clean)
 [![pypi][pypi]](https://pypi.org/project/tree-sitter-clean)
+[![crates.io][crates]](https://crates.io/crates/tree-sitter-clean)
 
 Clean grammar for [tree-sitter][].
 
@@ -59,6 +60,13 @@ let mut parser = tree_sitter::Parser::new();
 parser.set_language(&tree_sitter_clean::LANGUAGE.into())?;
 ```
 
+Add `tree-sitter-clean` to your `Cargo.toml` to use it as a dependency:
+
+```toml
+[dependencies]
+tree-sitter-clean = "1.2"
+```
+
 ### JavaScript
 ```js
 const Parser = require("tree-sitter");
@@ -82,3 +90,4 @@ import tree_sitter_clean
 [matrix]: https://img.shields.io/matrix/tree-sitter-chat%3Amatrix.org?logo=matrix&label=matrix
 [npm]: https://img.shields.io/npm/v/tree-sitter-clean?logo=npm
 [pypi]: https://img.shields.io/pypi/v/tree-sitter-clean?logo=pypi&logoColor=ffd242
+[crates]: https://img.shields.io/crates/v/tree-sitter-clean?logo=rust
