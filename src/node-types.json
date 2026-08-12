@@ -204,6 +204,10 @@
         "named": true
       },
       {
+        "type": "cons_pattern",
+        "named": true
+      },
+      {
         "type": "constructor_pattern",
         "named": true
       },
@@ -631,6 +635,10 @@
           },
           {
             "type": "operator_cons",
+            "named": true
+          },
+          {
+            "type": "operator_cons_strict",
             "named": true
           },
           {
@@ -1085,6 +1093,29 @@
         },
         {
           "type": "let_qualifier",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "cons_pattern",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "_pattern",
+          "named": true
+        },
+        {
+          "type": "operator_cons",
+          "named": true
+        },
+        {
+          "type": "operator_cons_strict",
           "named": true
         }
       ]
@@ -4421,6 +4452,10 @@
   },
   {
     "type": "operator_cons",
+    "named": true
+  },
+  {
+    "type": "operator_cons_strict",
     "named": true
   },
   {

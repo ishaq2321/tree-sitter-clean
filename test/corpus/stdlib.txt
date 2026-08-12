@@ -143,3 +143,68 @@ sfopen_ s i
     pattern: (identifier)
     body: (code_expression
       (abc_instruction))))
+
+==================
+Strict Cons
+==================
+toString (h:!t) = "[" +++ toString h +++ "]" +++ toS t
+toS (h:!t) = "," +++ toString h +++ toS t
+f x = x:!xs
+g y = y:xs
+
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    pattern: (paren_pattern
+      (cons_pattern
+        (identifier)
+        (operator_cons_strict)
+        (identifier)))
+    body: (binary_expression
+      (binary_expression
+        (binary_expression
+          (string)
+          operator: (operator)
+          (application
+            function: (identifier)
+            argument: (identifier)))
+        operator: (operator)
+        (string))
+      operator: (operator)
+      (application
+        function: (identifier)
+        argument: (identifier))))
+  (function_declaration
+    name: (identifier)
+    pattern: (paren_pattern
+      (cons_pattern
+        (identifier)
+        (operator_cons_strict)
+        (identifier)))
+    body: (binary_expression
+      (binary_expression
+        (string)
+        operator: (operator)
+        (application
+          function: (identifier)
+          argument: (identifier)))
+      operator: (operator)
+      (application
+        function: (identifier)
+        argument: (identifier))))
+  (function_declaration
+    name: (identifier)
+    pattern: (identifier)
+    body: (binary_expression
+      (identifier)
+      operator: (operator_cons_strict)
+      (identifier)))
+  (function_declaration
+    name: (identifier)
+    pattern: (identifier)
+    body: (binary_expression
+      (identifier)
+      operator: (operator_cons)
+      (identifier))))

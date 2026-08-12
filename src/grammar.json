@@ -4626,6 +4626,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "cons_pattern"
+        },
+        {
+          "type": "SYMBOL",
           "name": "strict_binding_pattern"
         },
         {
@@ -4983,6 +4987,36 @@
           "value": "]"
         }
       ]
+    },
+    "cons_pattern": {
+      "type": "PREC_LEFT",
+      "value": 2,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "SYMBOL",
+            "name": "_pattern"
+          },
+          {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "operator_cons"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "operator_cons_strict"
+              }
+            ]
+          },
+          {
+            "type": "SYMBOL",
+            "name": "_pattern"
+          }
+        ]
+      }
     },
     "record_pattern": {
       "type": "SEQ",
@@ -5508,6 +5542,31 @@
                 "content": {
                   "type": "SYMBOL",
                   "name": "operator_cons"
+                }
+              },
+              {
+                "type": "SYMBOL",
+                "name": "_expression"
+              }
+            ]
+          }
+        },
+        {
+          "type": "PREC_RIGHT",
+          "value": 2,
+          "content": {
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "_expression"
+              },
+              {
+                "type": "FIELD",
+                "name": "operator",
+                "content": {
+                  "type": "SYMBOL",
+                  "name": "operator_cons_strict"
                 }
               },
               {
@@ -7709,6 +7768,17 @@
         "content": {
           "type": "STRING",
           "value": ":"
+        }
+      }
+    },
+    "operator_cons_strict": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PREC",
+        "value": 0,
+        "content": {
+          "type": "STRING",
+          "value": ":!"
         }
       }
     },

@@ -1129,6 +1129,7 @@ module.exports = grammar({
         $.wildcard,
         $.constructor_pattern,
         $.identifier,
+        $.cons_pattern,
         $.strict_binding_pattern,
         $.lazy_pattern,
         $.strict_pattern,
@@ -1206,6 +1207,14 @@ module.exports = grammar({
         ),
         optional("!"), // spine-strict marker: `[a:b!]`
         "]",
+      ),
+
+    // `(x:xs)` / `(x:!xs)` — cons pattern: head, `:` (or strict `:!`), tail.
+    // Parenthesized in real code (`f (h:!t) = ...`), but usable bare too.
+    cons_pattern: ($) =>
+      prec.left(
+        PREC.CONSTRUCTOR,
+        seq($._pattern, choice($.operator_cons, $.operator_cons_strict), $._pattern),
       ),
 
     // `{ x = a, y = b }` — also the shorthand `{x, y}` (= `{x = x, y = y}`)
@@ -1309,6 +1318,8 @@ module.exports = grammar({
         prec.left(PREC.MULTIPLY, seq($._expression, field("operator", $.uniqueness_star), $._expression)),
         prec.right(PREC.EXPONENT, seq($._expression, field("operator", $.operator_exp), $._expression)),
         prec.right(PREC.CONSTRUCTOR, seq($._expression, field("operator", $.operator_cons), $._expression)),
+        // `x:!xs` — strict cons (forces the tail)
+        prec.right(PREC.CONSTRUCTOR, seq($._expression, field("operator", $.operator_cons_strict), $._expression)),
         // backtick-quoted infix operator: `x `bind` y`
         prec.left(PREC.ADD, seq($._expression, field("operator", $.backtick_operator), $._expression)),
         // generic fallback for any other operator symbol
@@ -1840,6 +1851,9 @@ module.exports = grammar({
     // `::` the longer literal wins by longest-match, so `::` never splits
     // into two cons operators in merged lexer states.
     operator_cons: ($) => token(prec(0, ":")),
+    // `x:!xs` — strict cons: forces the evaluation of the tail. Longest-match
+    // splits `:` from `:!` at equal precedence (both 0).
+    operator_cons_strict: ($) => token(prec(0, ":!")),
     operator_compare: ($) => token(prec(1, choice("==", "<>", "<", ">", "<=", ">="))),
     // Statement separator. Precedence 1 beats the default 0 of the rules it
     // separates, so a `;` after a member (case alternative, let-before
