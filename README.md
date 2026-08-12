@@ -85,6 +85,11 @@ import tree_sitter_clean
 - [Clean Language Report](https://clean-lang.org/)
 - [Clean Book](https://clean.cs.ru.nl/Clean)
 
+## Releasing
+
+See [RELEASE.md](RELEASE.md) for the verified procedure to publish to
+npm, PyPI, and crates.io.
+
 [ci]: https://img.shields.io/github/actions/workflow/status/ishaq2321/tree-sitter-clean/ci.yml?logo=github&label=CI
 [discord]: https://img.shields.io/discord/1063097320771698699?logo=discord&label=discord
 [matrix]: https://img.shields.io/matrix/tree-sitter-chat%3Amatrix.org?logo=matrix&label=matrix
