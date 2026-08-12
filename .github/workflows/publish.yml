@@ -4,35 +4,50 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 jobs:
   npm:
     name: Publish to npm
     runs-on: ubuntu-latest
-    if: ${{ secrets.NPM_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
-      - run: npm publish
+      - name: Publish
+        run: |
+          if [ -z "$NPM_TOKEN" ]; then
+            echo "NPM_TOKEN not set — skipping npm publish"
+            exit 0
+          fi
+          npm publish
         env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   crates:
     name: Publish to crates.io
     runs-on: ubuntu-latest
-    if: ${{ secrets.CARGO_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1
-      - run: cargo publish --token ${{ secrets.CARGO_TOKEN }}
+      - name: Publish
+        run: |
+          if [ -z "$CARGO_TOKEN" ]; then
+            echo "CARGO_TOKEN not set — skipping cargo publish"
+            exit 0
+          fi
+          cargo publish --token "$CARGO_TOKEN"
+        env:
+          CARGO_TOKEN: ${{ secrets.CARGO_TOKEN }}
 
   pypi:
     name: Publish to PyPI
     runs-on: ubuntu-latest
-    if: ${{ secrets.PYPI_TOKEN != '' }}
+    env:
+      PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -47,6 +62,7 @@ jobs:
           python -m build
 
       - name: Publish to PyPI
+        if: ${{ env.PYPI_TOKEN != '' }}
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          password: ${{ secrets.PYPI_TOKEN }}
+          password: ${{ env.PYPI_TOKEN }}
