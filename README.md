@@ -22,20 +22,34 @@ Clean grammar for [tree-sitter][].
 - Comprehensions (list comprehensions with generators, guards, let qualifiers)
 - Records (construction, update, field access)
 
+### Coverage
+
+The grammar is validated against the real-world Clean corpus
+(clean-stdlib, Clyde, cloogle.org — 120 `.icl` + 119 `.dcl` files):
+
+- **1833 ERROR nodes** across the `.icl` corpus vs 5129 before the grammar
+  overhaul (2.8× better), with the core stdlib (StdEnv, StdList,
+  StdString, StdMaybe) at **0 errors**
+- **13 ERROR nodes** across the `.dcl` corpus (down from 282)
+- 55/55 corpus tests, parse throughput ~1.3× the pre-overhaul parser
+
 ### Known Gaps
 
-Clean constructs the grammar does not (fully) parse yet — strict-cons
-patterns aside — are documented in [GRAMMAR-GAPS.md](GRAMMAR-GAPS.md),
-along with the approaches that were tried and rejected on the full corpus.
+Clean constructs the grammar does not (fully) parse yet are documented in
+[GRAMMAR-GAPS.md](GRAMMAR-GAPS.md), along with the approaches that were
+tried and rejected on the full corpus. Remaining gaps are confined to
+regions the reference parser also fails heavily; closing them is blocked
+by a tree-sitter generator action-table ceiling (see the doc).
 
 ### Node Types
 
-The grammar produces **69 named node types** for precise AST analysis, including:
+The grammar produces **189 named node types** for precise AST analysis, including:
 - `application` — function/constructor call detection
 - `field_access` — record field access
 - `list_comprehension` — with `generator`, `guard`, `let_qualifier`
 - `record_expression` / `record_update` — record manipulation
 - `wildcard` — `_` pattern
+- `type_definition` / `type_signature` / `class_context` — the type system
 
 ## Usage
 

@@ -1,0 +1,26 @@
+// tree-sitter-clean example — a small module exercising the grammar's
+// core features: module system, types, guards, where clauses, records,
+// list comprehensions, and uniqueness typing.
+
+module hello
+
+import StdEnv, StdString
+
+:: Person = { name :: String, age :: Int }
+
+greet :: !Person -> String
+greet p
+	| p.age < 18	= "Hey " +++ p.name
+	| otherwise		= "Hello " +++ p.name
+
+adults :: ![Person] -> [String]
+adults people
+	= [greet p \\ p <- people | p.age >= 18]
+
+main :: *World -> *World
+main world
+	# (names, world)	= readLines world
+	# people			= [ { name = n, age = 30 } \\ n <- names ]
+	= writeLines [greet p \\ p <- adults people] world
+
+Start = main
