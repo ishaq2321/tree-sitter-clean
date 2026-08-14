@@ -238,6 +238,63 @@ the same family; `as` cannot be reserved because it is a stdlib
 parameter name (`zip2 as bs`). Both remain open; they are not in the
 maintainer-reported Eastwood file.
 
+## 7. Single-quoted qualified names: `'Data.Error'.isError`
+
+Eastwood (and a handful of Clyde/cloogle files) write module-qualified
+names with the module in single quotes: `'Data.Error'.isError`,
+`'Data.Error'.Ok`, `'Clean.Types'.Type`, `'SP'.callProcess`. **224 uses**
+(214 Eastwood, 6 Clyde, 4 cloogle) in expression, type-signature, and
+pattern positions (`'syntax'.PD_Function pos id`), and even as record
+field names (`{'syntax'.rhs_alts = ...}`). This is the biggest remaining
+source of Eastwood's errors after the v1.2.1 import fixes (the headline
+file drops only 491 -> 425 while it remains open).
+
+**The token design is proven correct** — a single token
+`single_quoted_name` (`'` + module + `'` + `.` + member) lexes
+`'Data.Error'.isError` by longest-match over the char literal `'D'`,
+while lone `'a'`/`'D'`/`'.'` stay chars (verified in an isolated minimal
+grammar: all four probe shapes parse exactly right).
+
+**The wall:** the token adds ~17 distinct parse actions (it is valid in
+17,608 expression-start states, sharing ~17 action values), and the
+committed grammar has only ~8 free slots in the 65535-action table —
+`tree-sitter generate` 0.26.12 reports verbatim: *"Parse table action
+count 65554 exceeds maximum value of 65535"*. The 9 overflows corrupt
+the table exactly as documented in the root-cause section, so the token
+cannot ship as-is.
+
+**Every freeing lever tried and MEASURED (all failed to free ~10 actions):**
+
+- Extractions of repeated structures: `_name_head` (5-way name choice in
+  class_name/instance_class/_context_head/_context_item), `_member_sep`
+  (8× member separator idiom), `_function_body` (the three function-body
+  branches duplicated between function_declaration and operator_definition).
+  All behaviour-neutral, all zero headroom gained — tree-sitter does not
+  merge sub-automata across different parse contexts.
+- Unifying the 22 bare `";"` literals into the existing `_semi` token
+  (removes `anon_sym_semicolon` from SYMBOL_COUNT) — zero gain; action
+  ids are content-addressed, so the merge was already happening.
+- Removing `operator_dot` from `_operator_symbol` (only 3 name-position
+  uses in the whole corpus) — zero gain.
+- Wiring the token into `qualified_identifier` (both an inner-`prec`
+  `choice()` fold and an outer-`prec` fold) — same cost or far worse
+  (88 overflows for the inner fold).
+- Declaring conflicts for the token's real lexical ambiguity
+  (`[$.char, $.single_quoted_name]`) and for the record field/member
+  forks (`[$._record_update_fields, $._expression_atom]`,
+  `[$.record_update, $._expression_atom]`) — zero gain.
+- Upgrading the generator: tree-sitter CLI 0.25.7 and 0.26.12 both cap
+  the parse action count at 65535 (the runtime stores action ids as
+  uint16); no version widens the encoding.
+
+**One verified lead for future work:** the `[$._record_pattern_member,
+$._expression_atom]` conflict introduced in v1.2.1 is worth ~9 actions —
+removing it pushes the committed grammar 9 over. So *some* conflicts
+restructure states and free actions (the record_pattern member fork is
+one). Finding the next conflict with the same property — or migrating to
+a tree-sitter build with a wider action encoding — is the only known way
+forward.
+
 ## Regression hygiene
 
 When experimenting, ALWAYS re-measure the full corpus suite
