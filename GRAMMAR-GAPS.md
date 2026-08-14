@@ -14,10 +14,14 @@ a whole-file `ERROR` wrapper where the file previously parsed with local
 errors. Every rejected approach below was rejected for exactly this reason,
 measured on the full suite, not on isolated probes.
 
-The current verified baseline: **1833 ERROR nodes across 120 .icl files
-vs 5129 at the pre-overhaul commit** (and 13 across 119 .dcl files, down
-from 282); core stdlib (StdEnv / StdList / StdString / StdMaybe) at 0/0;
-corpus 51/51; throughput ~1.15× HEAD.
+The current verified baseline (v1.2.1): corpus **60/60** (5 new import
+regression tests); Eastwood (36 `.icl` files) **1897 ERROR nodes vs 2238**
+on the previous grammar; clean-stdlib root `Std*` files (25) **0/0**;
+Clyde+cloogle (123 `.icl`/`.dcl` files) **1786 vs 1790**; **0 action-table
+overflows**. (The v1.2.0 baseline of 1833 across 120 files was measured on
+a slightly different corpus selection and is superseded by the above,
+which is apples-to-apples against the previous grammar on identical file
+lists.)
 
 ## Root cause: the 65536-entry action-table limit
 
@@ -42,6 +46,40 @@ it is the reason token-level fixes (`!!`, `=:`, continuation bindings,
 gaps from here requires either reducing the automaton elsewhere to buy
 headroom, or migrating to a tree-sitter version that widens the action
 encoding — not adding more tokens.
+
+---
+
+## 0. Fixed in v1.2.1 — qualified / constructor-subset / derive imports
+
+The three import constructs that failed on Eastwood (the subject of
+clean-lang.org issue #15) now parse. All three are additions to
+`import_declaration` / `_import_item`:
+
+- `import qualified M` / `from M import qualified x` — `optional("qualified")`
+  in both branches. (`qualified` was verified to never occur as an
+  identifier in any corpus, so reserving it is safe.)
+- `:: MaybeError (Ok)` / `:: MaybeError (Ok, Err)` — constructor-subset
+  imports. Implemented as a dedicated named rule `constructor_subset`
+  (`(` + `constructor` + `, constructor` ... + `)`). Two things make it
+  work: the names are CAPITALIZED constructors (`Ok` lexes as
+  `constructor`, not `identifier` — the first attempt with `identifier`
+  silently never fired), and the dedicated named rule keeps its `(` shift
+  isolated from the shared `parenthesized_name`/paren states, exactly like
+  the pre-existing `class_method_name` trick. (An inline `seq("(", ...)`
+  in the choice never shifted `(` at all.)
+- `from M import derive gName Type` — a `derive` import item with the
+  generic name as `identifier` and the derived type as a single
+  `constructor` (every real-world use is a plain constructor name).
+
+**How they fit the 65536-entry budget:** extracting the shared
+`_record_pattern_members`/`_record_pattern_member` helpers from
+`record_pattern` (plus the `[$._record_pattern_member, $._expression_atom]`
+GLR conflict) restructured the automaton and bought the headroom — the
+same additions cost 476 overflows WITHOUT the refactor and 0 with it. The
+refactor is behaviour-neutral (all 55 pre-existing corpus tests pass
+unchanged; the extraction mirrors the field-list helper `record_update`
+already used). This is the "reduce the automaton elsewhere" path the
+intro promises, and it is the first verified success of that approach.
 
 ---
 
@@ -159,9 +197,50 @@ emitted at every deeper line). Requires the same member/separator
 mechanism as #2 plus a binding-lookahead heuristic — both blocked by the
 same walls.
 
+## 5. Record update by type name: `{ T | field = value, ... }`
+
+Eastwood constructs records with the type-name pipe form (the main
+remaining source of its errors — the whole-file wrapper in
+`EastwoodCleanLanguageServer.icl` starts at this definition):
+
+```clean
+{ ServerCapabilities
+| textDocumentSync = {openClose = True, save = True}
+, declarationProvider = True
+}
+```
+
+**Failed approaches (all measured on the full build, not probes):**
+
+- A dedicated `record_update_by_type` rule (`{` + `constructor` + `_pipe`
+  + field list) wired into `_expression_atom` — **199 overflow warnings**.
+  (The unwired rule measured ~0 because dead rules are pruned before table
+  generation — a dead-code measurement that misled early.)
+- The same rule with literal-only field values — **13468 overflows**: the
+  cost is the `|` after a constructor merging with the guard/context/
+  comprehension pipe states, not the value expression.
+- A dedicated pipe token / literal `"|"` / precedence tweaks — no help:
+  the `{`-opener context is already shared by record_expression,
+  record_update, record_pattern, array_expression and both
+  comprehensions; any new `{`-form forks all of them.
+
+Fitting this needs more headroom (a larger refactor like section 0's) or
+a tree-sitter version with wider action encoding.
+
+## 6. `=>` qualified imports and `as` aliases
+
+`StdOverloadedList.icl` (currently a 0-error stdlib file) contains
+`import StdOverloadedList => qualified subscript_error, ...` — a *third*
+qualified form. Today `=>` lexes as `=` + `>` (a bare `=` is not in the
+operator alphabet), so the import false-passes with a wrong tree in some
+positions and errors in others. The `as` alias form (`import M as N`) is
+the same family; `as` cannot be reserved because it is a stdlib
+parameter name (`zip2 as bs`). Both remain open; they are not in the
+maintainer-reported Eastwood file.
+
 ## Regression hygiene
 
-When experimenting, ALWAYS re-measure the full 120-file suite
+When experimenting, ALWAYS re-measure the full corpus suite
 (`bash /tmp/regress2.sh <mine.so> <head.so>`) and compare against the
 committed baseline (**1833**). A construct that parses in isolation but
 moves the suite total up is a regression, not a fix. Also check for the
