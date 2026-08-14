@@ -34,6 +34,77 @@ from StdEnv import map, filter
     (identifier)))
 
 ==================
+Qualified Import
+==================
+import qualified Data.Error
+---
+
+(source_file
+  (import_declaration
+    (module_name
+      (module_identifier)
+      (module_identifier))))
+
+==================
+Qualified Import with Type
+==================
+from LSP.Range import qualified :: Range {..}
+---
+
+(source_file
+  (import_declaration
+    (module_name
+      (module_identifier)
+      (module_identifier))
+    (constructor)
+    (range_operator)))
+
+==================
+Constructor Subset Import (single)
+==================
+from Data.Error import :: MaybeError (Ok)
+---
+
+(source_file
+  (import_declaration
+    (module_name
+      (module_identifier)
+      (module_identifier))
+    (constructor)
+    (constructor_subset
+      (constructor))))
+
+==================
+Constructor Subset Import (multiple)
+==================
+from Data.Error import :: MaybeError (Ok, Err)
+---
+
+(source_file
+  (import_declaration
+    (module_name
+      (module_identifier)
+      (module_identifier))
+    (constructor)
+    (constructor_subset
+      (constructor)
+      (constructor))))
+
+==================
+Derive Import
+==================
+from LSP.PublishDiagnosticsParams import derive gLSPJSONEncode PublishDiagnosticsParams
+---
+
+(source_file
+  (import_declaration
+    (module_name
+      (module_identifier)
+      (module_identifier))
+    (identifier)
+    (constructor)))
+
+==================
 Type Signature
 ==================
 factorial :: Int -> Int

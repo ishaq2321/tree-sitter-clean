@@ -46,7 +46,21 @@ Set them with `gh secret set NAME -R ishaq2321/tree-sitter-clean`.
    # must print 0
    ```
 
-4. **Commit and push master**, then **create and push the tag** (this
+4. **Corpus regression battery** — parse every corpus with the candidate
+   grammar and compare against the same run on the previous release's
+   grammar. No file may get MORE errors than before. The three corpora:
+
+   - `test/corpus/` — `npx tree-sitter test` (all green)
+   - Eastwood (`gitlab.com/clean-and-itasks/eastwood`, every `.icl`)
+   - `clean-stdlib` (`gitlab.science.ru.nl/clean-compiler-and-rts/stdenv`,
+     at least all 25 root `Std*.icl` files — these must be 0 errors)
+   - `Clyde` + `cloogle.org` (all `.icl`/`.dcl`)
+
+   Count ERROR nodes per file with `npx tree-sitter parse <file> | grep -c ERROR`.
+   Error-recovery cascades mean a single new construct can change a file's
+   count by hundreds, so compare totals per corpus, not per file.
+
+5. **Commit and push master**, then **create and push the tag** (this
    triggers the publish workflow):
 
    ```bash

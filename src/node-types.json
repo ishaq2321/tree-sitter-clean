@@ -1219,6 +1219,21 @@
     }
   },
   {
+    "type": "constructor_subset",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "constructor",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "data_constructor",
     "named": true,
     "fields": {
@@ -2139,6 +2154,10 @@
         },
         {
           "type": "constructor",
+          "named": true
+        },
+        {
+          "type": "constructor_subset",
           "named": true
         },
         {
@@ -4589,6 +4608,10 @@
   {
     "type": "parenthesized_operator",
     "named": true
+  },
+  {
+    "type": "qualified",
+    "named": false
   },
   {
     "type": "question_marker",

@@ -112,6 +112,9 @@ module.exports = grammar({
     // record pattern `{x, y}` vs. record expression `{x = a}` — same `{ name`
     // prefix, disambiguated by what follows (`,`/`}` = pattern, `=` = expr)
     [$.record_pattern, $._expression_atom],
+    // ... and the same fork at the individual record-pattern-member level
+    // (`{ # { id, ... }` — array of records: `id` is a member or an expr)
+    [$._record_pattern_member, $._expression_atom],
     // comprehension generator body is an expression; in `case`/`with`/let the
     // same tokens could start a pattern. Disambiguate expression vs. pattern.
     [$._pattern, $._expression_atom],
@@ -271,11 +274,17 @@ module.exports = grammar({
       prec.left(
         seq(
           choice(
-            seq("import", field("module", $.module_name), repeat(seq(",", field("module", $.module_name)))),
+            seq(
+              "import",
+              optional("qualified"),
+              field("module", $.module_name),
+              repeat(seq(",", field("module", $.module_name))),
+            ),
             seq(
               "from",
               field("module", $.module_name),
               "import",
+              optional("qualified"),
               choice(
                 // inline list: `from M import x, y`
                 seq($._import_item, repeat(seq(",", $._import_item))),
@@ -315,8 +324,19 @@ module.exports = grammar({
           // `:: TypeCode (..)` / `:: Date{..}` — the all-members suffix.
           // `(..)` lexes as one token; `{..}` is the record all-fields form
           // (`from StdLibMisc import :: Date{..}`).
-          optional(choice($.parenthesized_operator,
-                          seq("{", $.range_operator, "}"))),
+          optional(choice(
+            $.parenthesized_operator,
+            seq("{", $.range_operator, "}"),
+            // `:: MaybeError (Ok)` — constructor-subset imports. A dedicated
+            // named rule (like class_method_name) keeps its `(` shift
+            // isolated from the shared parenthesized_name/paren states.
+            $.constructor_subset,
+          )),
+        ),
+        seq(
+          "derive",
+          $.identifier,
+          $.constructor,
         ),
         seq(
           "class",
@@ -415,6 +435,19 @@ module.exports = grammar({
     // parenthesized_name rule so its `(` shift cannot pollute unrelated
     // states (instance heads, signature names).
     class_method_name: ($) => seq("(", $.identifier, ")"),
+
+    // `(Ok)` / `(Ok, Err)` — a constructor-subset import (`:: MaybeError (Ok)`):
+    // import only the listed constructors of a type. Constructors are
+    // capitalized (Ok, Err), so they lex as `constructor` not `identifier`.
+    // Named rule so its `(` shift is isolated like class_method_name's,
+    // instead of merging with the shared parenthesized_name states.
+    constructor_subset: ($) =>
+      seq(
+        "(",
+        $.constructor,
+        repeat(seq(",", $.constructor)),
+        ")",
+      ),
 
     // `, [u <= v, u <= w]` — uniqueness constraints that follow a signature.
     // The left side may be a full type (`[w u <= v]` — a uniqueness variable
@@ -1283,14 +1316,20 @@ module.exports = grammar({
     record_pattern: ($) =>
       seq(
         "{",
-        repeat1(
-          seq(
-            field("field", $.identifier),
-            optional(seq("=", $._pattern)),
-          ),
-        ),
-        repeat(seq(",", seq(field("field", $.identifier), optional(seq("=", $._pattern))))),
+        $._record_pattern_members,
         "}",
+      ),
+
+    _record_pattern_members: ($) =>
+      seq(
+        repeat1($._record_pattern_member),
+        repeat(seq(",", $._record_pattern_member)),
+      ),
+
+    _record_pattern_member: ($) =>
+      seq(
+        field("field", $.identifier),
+        optional(seq("=", $._pattern)),
       ),
 
     paren_pattern: ($) => seq("(", $._pattern, optional($.operator), ")"),
@@ -1692,16 +1731,20 @@ module.exports = grammar({
         "{",
         field("record", $._expression),
         "&",
-        repeat1(
-          seq(
-            optional(","),
-            field("field", $.update_field),
-            "=",
-            field("value", $._expression),
-          ),
-        ),
+        $._record_update_fields,
         "}",
       ),
+
+    _record_update_fields: ($) =>
+      repeat1(
+        seq(
+          optional(","),
+          field("field", $.update_field),
+          "=",
+          field("value", $._expression),
+        ),
+      ),
+
 
     // The LHS of one update binding: either a record field name or an array
     // index. For array element updates Clean allows a range too: `& [i..j] = v`.
