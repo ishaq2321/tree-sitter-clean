@@ -699,6 +699,7 @@ module.exports = grammar({
         $.question_type,
         $.builtin_question_type,
         $.generic_kind_type,
+        $.single_quoted_name,
       ),
 
     // `{|*|}` — the generic kind applied to a class in a context head
@@ -1271,7 +1272,7 @@ module.exports = grammar({
     constructor_pattern: ($) =>
       prec.left(
         seq(
-          field("constructor", $.constructor),
+          field("constructor", choice($.constructor, $.single_quoted_name)),
           repeat(field("argument", $._pattern_atom)),
         ),
       ),
@@ -1777,6 +1778,7 @@ module.exports = grammar({
     _expression_atom: ($) =>
       choice(
         $.qualified_identifier,
+        $.single_quoted_name,
         $.parenthesized_operator,
         $.constructor,
         $.identifier,
@@ -1901,6 +1903,20 @@ module.exports = grammar({
     // `(x)` in expression or pattern position stays a `paren_expression` or
     // `paren_pattern`.
     parenthesized_name: ($) => seq("(", $.identifier, ")"),
+    // `'Data.Error'.isError` — a module-qualified name whose module is wrapped
+    // in single quotes (Eastwood/Clyde style). ONE token: the lexer picks it
+    // over a char literal by longest match; a lone `'M'` stays a char.
+    single_quoted_name: ($) =>
+      token(
+        seq(
+          "'",
+          /[A-Za-z0-9_.']+/,
+          "'",
+          ".",
+          /[A-Za-z0-9_']+/,
+        ),
+      ),
+
 
     // A bare operator in a *name* position: context head (`| == a`),
     // instance head (`instance == [a]`), fixity declaration (`infixl 6 +`)
@@ -2019,7 +2035,7 @@ module.exports = grammar({
 
     range_operator: ($) => token(prec(2, "..")),
 
-    boolean: ($) => choice("True", "False"),
+    boolean: ($) => token(prec(1, choice("True", "False"))),
 
     integer: ($) => /[0-9]+/,
     float: ($) => /[0-9]+\.[0-9]+([eE][+-]?[0-9]+)?|[0-9]+[eE][+-]?[0-9]+/,

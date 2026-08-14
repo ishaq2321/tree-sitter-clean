@@ -104,6 +104,64 @@ from LSP.PublishDiagnosticsParams import derive gLSPJSONEncode PublishDiagnostic
     (identifier)
     (constructor)))
 
+
+==================
+Single-Quoted Name (expression)
+==================
+f = 'Data.Error'.isError x
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    body: (application
+      function: (single_quoted_name)
+      argument: (identifier))))
+
+==================
+Single-Quoted Name (type position)
+==================
+t :: 'Clean.Types'.Type
+---
+
+(source_file
+  (type_signature
+    name: (signature_name
+      (identifier))
+    type: (single_quoted_name)))
+
+==================
+Single-Quoted Name (pattern position)
+==================
+h ('syntax'.PD_Function pos id) = pos
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    pattern: (paren_pattern
+      (constructor_pattern
+        constructor: (single_quoted_name)
+        argument: (identifier)
+        argument: (identifier)))
+    body: (identifier)))
+
+==================
+Boolean Literals
+==================
+b = True
+c = False
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    body: (boolean))
+  (function_declaration
+    name: (identifier)
+    body: (boolean)))
+
+
 ==================
 Type Signature
 ==================

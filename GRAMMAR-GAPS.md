@@ -238,62 +238,61 @@ the same family; `as` cannot be reserved because it is a stdlib
 parameter name (`zip2 as bs`). Both remain open; they are not in the
 maintainer-reported Eastwood file.
 
-## 7. Single-quoted qualified names: `'Data.Error'.isError`
+## 7. ~~Single-quoted qualified names: `'Data.Error'.isError`~~ — FIXED in v1.2.2
 
-Eastwood (and a handful of Clyde/cloogle files) write module-qualified
-names with the module in single quotes: `'Data.Error'.isError`,
-`'Data.Error'.Ok`, `'Clean.Types'.Type`, `'SP'.callProcess`. **224 uses**
-(214 Eastwood, 6 Clyde, 4 cloogle) in expression, type-signature, and
-pattern positions (`'syntax'.PD_Function pos id`), and even as record
-field names (`{'syntax'.rhs_alts = ...}`). This is the biggest remaining
-source of Eastwood's errors after the v1.2.1 import fixes (the headline
-file drops only 491 -> 425 while it remains open).
+**Status: fixed.** Eastwood (and a handful of Clyde/cloogle files) write
+module-qualified names with the module in single quotes: `'Data.Error'.isError`,
+`'Data.Error'.Ok`, `'Clean.Types'.Type`. **224 uses** (214 Eastwood, 6 Clyde,
+4 cloogle) in expression, type-signature, and pattern positions
+(`'syntax'.PD_Function pos id`). This was the biggest remaining source of
+Eastwood's errors after the v1.2.1 import fixes; it is now parsed in all three
+positions.
 
-**The token design is proven correct** — a single token
-`single_quoted_name` (`'` + module + `'` + `.` + member) lexes
-`'Data.Error'.isError` by longest-match over the char literal `'D'`,
-while lone `'a'`/`'D'`/`'.'` stay chars (verified in an isolated minimal
-grammar: all four probe shapes parse exactly right).
+**How it fits:** the token design from the v1.2.1 investigation was correct —
+one token `single_quoted_name` (`'` + module + `'` + `.` + member) lexes
+`'Data.Error'.isError` by longest-match over the char literal `'D'`, while
+lone `'a'`/`'D'`/`'\n'` stay chars. The blocker was the 65535-action ceiling:
+the token adds ~17 distinct parse actions with only ~8 free (9 overflows).
+The winning lever, found and measured this session:
 
-**The wall:** the token adds ~17 distinct parse actions (it is valid in
-17,608 expression-start states, sharing ~17 action values), and the
-committed grammar has only ~8 free slots in the 65535-action table —
-`tree-sitter generate` 0.26.12 reports verbatim: *"Parse table action
-count 65554 exceeds maximum value of 65535"*. The 9 overflows corrupt
-the table exactly as documented in the root-cause section, so the token
-cannot ship as-is.
+**Merge the two boolean literals into one token.**
+`boolean: choice("True", "False")` (two anonymous tokens) became
+`boolean: token(prec(1, choice("True", "False")))` — one named token. Two
+critical findings made this safe:
 
-**Every freeing lever tried and MEASURED (all failed to free ~10 actions):**
+1. **The naive merge is a generator trap.** `token(choice("True", "False"))`
+   and `/True|False/` both generate a `boolean` symbol with *zero* lexer
+   acceptance — `True`/`False` silently fall through to `constructor`, a
+   tree-shape regression. Only `token(prec(1, choice(...)))` produces a
+   properly lexed token. Verified directly in the generated `ts_lex` DFA
+   (ACCEPT_TOKEN(sym_boolean) present only with `prec`).
+2. **The merge is behavior-neutral** in every position: expression `x = True`
+   stays `(boolean)`; pattern `f True = 1` stays `(constructor_pattern
+   (constructor))`; `data Bool = True | False` keeps its pre-existing shape —
+   byte-identical trees vs. the old grammar on all boolean probes. The corpus
+   tests lock this in.
 
-- Extractions of repeated structures: `_name_head` (5-way name choice in
-  class_name/instance_class/_context_head/_context_item), `_member_sep`
-  (8× member separator idiom), `_function_body` (the three function-body
-  branches duplicated between function_declaration and operator_definition).
-  All behaviour-neutral, all zero headroom gained — tree-sitter does not
-  merge sub-automata across different parse contexts.
-- Unifying the 22 bare `";"` literals into the existing `_semi` token
-  (removes `anon_sym_semicolon` from SYMBOL_COUNT) — zero gain; action
-  ids are content-addressed, so the merge was already happening.
-- Removing `operator_dot` from `_operator_symbol` (only 3 name-position
-  uses in the whole corpus) — zero gain.
-- Wiring the token into `qualified_identifier` (both an inner-`prec`
-  `choice()` fold and an outer-`prec` fold) — same cost or far worse
-  (88 overflows for the inner fold).
-- Declaring conflicts for the token's real lexical ambiguity
-  (`[$.char, $.single_quoted_name]`) and for the record field/member
-  forks (`[$._record_update_fields, $._expression_atom]`,
-  `[$.record_update, $._expression_atom]`) — zero gain.
-- Upgrading the generator: tree-sitter CLI 0.25.7 and 0.26.12 both cap
-  the parse action count at 65535 (the runtime stores action ids as
-  uint16); no version widens the encoding.
+**Wiring:** `single_quoted_name` is in `_expression_atom`, `_type_atom`, and
+as an alternative head of `constructor_pattern` (so pattern arguments like
+`'syntax'.PD_Function pos id` follow it). A bare-atom entry in `_pattern` was
+tried and removed: it competed with `constructor_pattern` and made the parser
+reduce before seeing arguments (a GLR state-merge artifact); `constructor_pattern`
+with a zero-argument repeat covers bare usage.
 
-**One verified lead for future work:** the `[$._record_pattern_member,
-$._expression_atom]` conflict introduced in v1.2.1 is worth ~9 actions —
-removing it pushes the committed grammar 9 over. So *some* conflicts
-restructure states and free actions (the record_pattern member fork is
-one). Finding the next conflict with the same property — or migrating to
-a tree-sitter build with a wider action encoding — is the only known way
-forward.
+**Measured impact (same file lists, HEAD vs new, 0 table overflows):**
+
+| Corpus | HEAD | New |
+|---|---|---|
+| Corpus tests | 60/60 | **64/64** (+4) |
+| Eastwood .icl (36 files) | 1897 | **1118** |
+| Eastwood .dcl (27 files) | 131 | **65** |
+| Eastwood headline `EastwoodCleanLanguageServer.icl` | 425 | **180** |
+| stdenv `Std*` (25 files) | 0 | **0** |
+| Clyde + cloogle (123 files) | 1786 | **1773** |
+
+All remaining Eastwood errors trace to gap #5 (record update by type name).
+Parse performance is unchanged or better (the headline file parses in ~20 ms
+vs ~34 ms on HEAD — fewer errors means less error recovery).
 
 ## Regression hygiene
 
