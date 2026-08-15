@@ -2006,15 +2006,23 @@
     "named": true,
     "fields": {},
     "children": {
-      "multiple": false,
+      "multiple": true,
       "required": true,
       "types": [
+        {
+          "type": "arrow",
+          "named": true
+        },
         {
           "type": "constructor",
           "named": true
         },
         {
           "type": "operator_mul",
+          "named": true
+        },
+        {
+          "type": "parenthesized_operator",
           "named": true
         },
         {
@@ -2673,9 +2681,13 @@
     "named": true,
     "fields": {
       "kind": {
-        "multiple": false,
+        "multiple": true,
         "required": true,
         "types": [
+          {
+            "type": "arrow",
+            "named": true
+          },
           {
             "type": "constructor",
             "named": true
@@ -4506,6 +4518,10 @@
   },
   {
     "type": "=:",
+    "named": false
+  },
+  {
+    "type": "=>",
     "named": false
   },
   {

@@ -1,0 +1,24 @@
+
+==================
+Old-Style => Qualified Import
+==================
+import Control.Monad => qualified join
+---
+(source_file
+  (import_declaration
+    module: (module_name
+      (module_identifier)
+      (module_identifier))
+    (identifier)))
+
+==================
+Error Handler Definition
+==================
+subscript_error => abort "Subscript error in !!||,index too large"
+---
+(source_file
+  (function_declaration
+    name: (identifier)
+    body: (application
+      function: (identifier)
+      argument: (string))))

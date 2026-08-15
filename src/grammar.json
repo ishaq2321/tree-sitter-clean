@@ -269,24 +269,75 @@
                     }
                   },
                   {
-                    "type": "REPEAT",
-                    "content": {
-                      "type": "SEQ",
-                      "members": [
-                        {
-                          "type": "STRING",
-                          "value": ","
-                        },
-                        {
-                          "type": "FIELD",
-                          "name": "module",
-                          "content": {
-                            "type": "SYMBOL",
-                            "name": "module_name"
-                          }
+                    "type": "CHOICE",
+                    "members": [
+                      {
+                        "type": "REPEAT",
+                        "content": {
+                          "type": "SEQ",
+                          "members": [
+                            {
+                              "type": "STRING",
+                              "value": ","
+                            },
+                            {
+                              "type": "FIELD",
+                              "name": "module",
+                              "content": {
+                                "type": "SYMBOL",
+                                "name": "module_name"
+                              }
+                            }
+                          ]
                         }
-                      ]
-                    }
+                      },
+                      {
+                        "type": "SEQ",
+                        "members": [
+                          {
+                            "type": "STRING",
+                            "value": "=>"
+                          },
+                          {
+                            "type": "CHOICE",
+                            "members": [
+                              {
+                                "type": "STRING",
+                                "value": "qualified"
+                              },
+                              {
+                                "type": "BLANK"
+                              }
+                            ]
+                          },
+                          {
+                            "type": "SEQ",
+                            "members": [
+                              {
+                                "type": "SYMBOL",
+                                "name": "_import_item"
+                              },
+                              {
+                                "type": "REPEAT",
+                                "content": {
+                                  "type": "SEQ",
+                                  "members": [
+                                    {
+                                      "type": "STRING",
+                                      "value": ","
+                                    },
+                                    {
+                                      "type": "SYMBOL",
+                                      "name": "_import_item"
+                                    }
+                                  ]
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
                   }
                 ]
               },
@@ -1937,17 +1988,9 @@
         }
       ]
     },
-    "generic_kind_type": {
+    "_generic_kind": {
       "type": "SEQ",
       "members": [
-        {
-          "type": "STRING",
-          "value": "{"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "_pipe"
-        },
         {
           "type": "CHOICE",
           "members": [
@@ -1962,8 +2005,62 @@
             {
               "type": "SYMBOL",
               "name": "operator_mul"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "parenthesized_operator"
             }
           ]
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "arrow"
+              },
+              {
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "SYMBOL",
+                    "name": "type_variable"
+                  },
+                  {
+                    "type": "SYMBOL",
+                    "name": "constructor"
+                  },
+                  {
+                    "type": "SYMBOL",
+                    "name": "operator_mul"
+                  },
+                  {
+                    "type": "SYMBOL",
+                    "name": "parenthesized_operator"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "generic_kind_type": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "{"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_pipe"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_generic_kind"
         },
         {
           "type": "SYMBOL",
@@ -3556,6 +3653,10 @@
                       {
                         "type": "STRING",
                         "value": "=:"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "=>"
                       }
                     ]
                   },
@@ -7834,25 +7935,8 @@
           "type": "FIELD",
           "name": "kind",
           "content": {
-            "type": "CHOICE",
-            "members": [
-              {
-                "type": "SYMBOL",
-                "name": "type_variable"
-              },
-              {
-                "type": "SYMBOL",
-                "name": "constructor"
-              },
-              {
-                "type": "SYMBOL",
-                "name": "parenthesized_operator"
-              },
-              {
-                "type": "SYMBOL",
-                "name": "operator_mul"
-              }
-            ]
+            "type": "SYMBOL",
+            "name": "_generic_kind"
           }
         },
         {
@@ -8512,6 +8596,10 @@
     [
       "function_declaration",
       "macro_definition"
+    ],
+    [
+      "macro_definition",
+      "operator_definition"
     ],
     [
       "_pattern",

@@ -24,3 +24,20 @@ bx = bimap{|*|}
       function: (identifier)
       argument: (kind_expression
         kind: (operator_mul)))))
+
+==================
+Higher-Kinded Generic Selector
+==================
+bx = bimap{|(*)->*->*|}
+---
+(source_file
+  (function_declaration
+    name: (identifier)
+    body: (application
+      function: (identifier)
+      argument: (kind_expression
+        kind: (parenthesized_operator)
+        kind: (arrow)
+        kind: (operator_mul)
+        kind: (arrow)
+        kind: (operator_mul)))))

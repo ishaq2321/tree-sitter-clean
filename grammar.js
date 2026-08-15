@@ -120,6 +120,9 @@ module.exports = grammar({
     [$._pattern, $._expression_atom],
     // function vs. macro LHS both start with `name pat...`
     [$.function_declaration, $.macro_definition],
+    // `(op) pat` — a parenthesized operator can head a macro OR a generic
+    // case definition; the `=>` body-separator state split surfaces it.
+    [$.macro_definition, $.operator_definition],
     // record-update pattern `ds & f` vs. a bare identifier pattern
     [$._pattern, $.record_update_pattern],
     // a let-before block's `= expr` member vs. ending the function body there
@@ -278,7 +281,18 @@ module.exports = grammar({
               "import",
               optional("qualified"),
               field("module", $.module_name),
-              repeat(seq(",", field("module", $.module_name))),
+              choice(
+                // `import M, M2` — several modules at once
+                repeat(seq(",", field("module", $.module_name))),
+                // `import M => qualified join` — the OLD qualified-import
+                // form (cloogle, Eastwood): `=>` lists the items imported
+                // from M, optionally qualified.
+                seq(
+                  "=>",
+                  optional("qualified"),
+                  seq($._import_item, repeat(seq(",", $._import_item))),
+                ),
+              ),
             ),
             seq(
               "from",
@@ -702,16 +716,26 @@ module.exports = grammar({
         $.single_quoted_name,
       ),
 
+    // The kind grammar for generic selectors (`{|*|}`, `{|PAIR|}`, `{|c|}`, and
+    // higher-kinded `{|(*)->*->*|}`): atoms (`*` = the product/tuple
+    // constructor lexed as operator_mul, a type variable, a constructor, or a
+    // parenthesised operator like `(*)`) separated by `->` arrows.
+    _generic_kind: ($) =>
+      seq(
+        choice($.type_variable, $.constructor, $.operator_mul, $.parenthesized_operator),
+        repeat(
+          seq($.arrow, choice($.type_variable, $.constructor, $.operator_mul, $.parenthesized_operator)),
+        ),
+      ),
+
     // `{|*|}` — the generic kind applied to a class in a context head
-    // (`| JSONEncode{|*|} a`): the type-constructor kind, written with a
-    // `*` (the product/tuple constructor, lexed as operator_mul) or a
-    // constructor/variable (`{|PAIR|}`, `{|c|}`). Same shape as the
-    // generic_case_definition kind selector.
+    // (`| JSONEncode{|*|} a`). Same shape as the generic_case_definition
+    // kind selector.
     generic_kind_type: ($) =>
       seq(
         "{",
         $._pipe,
-        choice($.type_variable, $.constructor, $.operator_mul),
+        $._generic_kind,
         $._pipe,
         "}",
       ),
@@ -1020,7 +1044,7 @@ module.exports = grammar({
             // `f x = e` and the strict form `f x =: e` (used by Clyde's
             // `name =: accUnsafe f` and stdlib guard alternatives like
             // `isJustU nothing =: ?|None`).
-            seq(choice("=", "=:"), field("body", $._expression), optional($._where_or_with), optional($._semi)),
+            seq(choice("=", "=:", "=>"), field("body", $._expression), optional($._where_or_with), optional($._semi)),
             seq(
               // Guard lists may MIX guards, let-before bindings and bodies at
               // one level (`| not ok` ... `# (a,b) = get` ... `| isJust a`):
@@ -1840,14 +1864,14 @@ module.exports = grammar({
         ),
       ),
 
-    // `{|*|}` / `{|PAIR|}` / `{|c|}` — a generic kind used as an expression
-    // (e.g. `bx = bimap{|*|}` refers to the generic function specialised at
-    // the product constructor).
+    // `{|*|}` / `{|PAIR|}` / `{|c|}` / `{|(*)->*->*|}` — a generic kind used
+    // as an expression (e.g. `bx = bimap{|*|}` refers to the generic function
+    // specialised at the product constructor).
     kind_expression: ($) =>
       seq(
         "{",
         $._pipe,
-        field("kind", choice($.type_variable, $.constructor, $.parenthesized_operator, $.operator_mul)),
+        field("kind", $._generic_kind),
         $._pipe,
         "}",
       ),
