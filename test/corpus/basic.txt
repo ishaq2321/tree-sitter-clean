@@ -652,3 +652,41 @@ system module Runtime
   (module_declaration
     (module_name
       (module_identifier))))
+
+==================
+Multi-Guard Case Alternative
+==================
+f x = case token of
+	_ -> b0
+	_
+		| isDigit x
+			-> b1
+		| isLower x
+			-> b2
+---
+(source_file
+  (function_declaration
+    name: (identifier)
+    pattern: (identifier)
+    body: (case_expression
+      subject: (identifier)
+      (case_alternative
+        pattern: (wildcard)
+        (arrow)
+        body: (identifier))
+      (case_alternative
+        pattern: (wildcard)
+        (guard_equation
+          condition: (application
+            function: (identifier)
+            argument: (identifier))
+          (guard_body
+            (arrow)
+            body: (identifier)))
+        (guard_equation
+          condition: (application
+            function: (identifier)
+            argument: (identifier))
+          (guard_body
+            (arrow)
+            body: (identifier)))))))

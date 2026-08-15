@@ -281,6 +281,11 @@ module.exports = grammar({
               "import",
               optional("qualified"),
               field("module", $.module_name),
+              // `import qualified M as N` — module alias (CloogleServer.icl,
+              // Clyde, Eastwood). `as` is context-reserved: it is only a
+              // literal in the import state, so stdlib parameter uses
+              // (`zip2 as bs`) are unaffected.
+              optional(seq("as", field("alias", $.module_name))),
               choice(
                 // `import M, M2` — several modules at once
                 repeat(seq(",", field("module", $.module_name))),
@@ -1594,20 +1599,45 @@ module.exports = grammar({
         // after the pattern — a `_layout_start` here is unreachable because
         // the greedy pattern atoms keep the parser in "pattern continuation"
         // states where no layout token is requested.
-        prec(1, seq(
-          field("pattern", $._pattern),
-          seq($.guard_binding, optional($.with_block)),
-          repeat1(
-            seq(
-              optional(choice($._layout_semicolon, seq(";", optional($._layout_semicolon)))),
-              choice(
-                seq($.guard_binding, optional($.with_block)),
-                $.guard_body,
-                $.guard_equation,
+        prec.left(1, choice(
+          // binding-first (Clyde): `pat # ...` then `->`/`=` bodies or more
+          // bindings/guards; a lone binding is not a complete alternative, so
+          // at least one continuation member is required.
+          seq(
+            field("pattern", $._pattern),
+            seq($.guard_binding, optional($.with_block)),
+            repeat1(
+              seq(
+                optional(choice($._layout_semicolon, seq(";", optional($._layout_semicolon)))),
+                choice(
+                  seq($.guard_binding, optional($.with_block)),
+                  $.guard_body,
+                  $.guard_equation,
+                ),
               ),
             ),
+            optional(choice($._layout_semicolon, seq(";", optional($._layout_semicolon)))),
           ),
-          optional(choice($._layout_semicolon, seq(";", optional($._layout_semicolon)))),
+          // guard-first (Clyde's multi-guard alternative):
+          // `pat | c1 -> b1 | c2 -> b2` — the first member is a guard (whose
+          // nested block holds the deeper `->`/`=` bodies); continuation
+          // guards are optional. Reuses guard_equation so the continuation
+          // needs no new `_pipe`-after-body states.
+          seq(
+            field("pattern", $._pattern),
+            $.guard_equation,
+            repeat(
+              seq(
+                optional(choice($._layout_semicolon, seq(";", optional($._layout_semicolon)))),
+                choice(
+                  seq($.guard_binding, optional($.with_block)),
+                  $.guard_body,
+                  $.guard_equation,
+                ),
+              ),
+            ),
+            optional(choice($._layout_semicolon, seq(";", optional($._layout_semicolon)))),
+          ),
         )),
       ),
 

@@ -14,11 +14,11 @@ a whole-file `ERROR` wrapper where the file previously parsed with local
 errors. Every rejected approach below was rejected for exactly this reason,
 measured on the full suite, not on isolated probes.
 
-The current verified baseline (v1.2.3): corpus **71/71**; Eastwood
-(63 `.icl` + `.dcl` files) **824 ERROR nodes** (headline
+The current verified baseline (master, post-v1.2.3): corpus **73/73**;
+Eastwood (63 `.icl` + `.dcl` files) **813 ERROR nodes** (headline
 `EastwoodCleanLanguageServer.icl`: **110**); clean-stdlib root `Std*`
-files (25) **0/0**; Clyde+cloogle **1522**; total across all 151 corpus
-files **2346** (was 2948 at v1.2.0, net **-602**); **0 action-table
+files (25) **0/0**; Clyde+cloogle **1423**; total across all 151 corpus
+files **2236** (was 2948 at v1.2.0, net **-712**); **0 action-table
 overflows**. (The v1.2.1 figures below — 60/60, 1897 Eastwood, 1786
 Clyde+cloogle — were measured on a smaller file selection and are
 superseded by the above, which is apples-to-apples against the previous
@@ -232,7 +232,7 @@ errors**; `{ T | f = v }` in expression, argument and tuple positions all
 parse as `record_update`; total corpus errors **2948 → 2346** (−602)
 across 151 files (Std* 0).
 
-## 5b. Multi-guard case alternatives: `case x of p | c1 -> b1 | c2 -> b2` — NEW GAP (v1.2.3 regression)
+## 5b. ~~Multi-guard case alternatives: `case x of p | c1 -> b1 | c2 -> b2`~~ — FIXED in v1.2.4
 
 A case alternative whose guard list continues on later lines (common in
 Clyde's `coloured_line.icl`, `CloogleServer.icl`, `builddb.icl` and a few
@@ -320,20 +320,28 @@ Key facts established:
    branch (~1.6k actions, by resolving existing GLR forks statically); it
    is far short of the ~10k needed.
 
-Conclusion: closing this gap requires freeing ~10k actions elsewhere
-(a major automaton refactor — the v1.2.1 record-member extraction bought
-only ~500) or a future tree-sitter with a wider action encoding. Both are
-multi-week efforts with uncertain payoff; the gap is documented so a
-future attempt starts from these numbers.
+**FIXED in v1.2.4 — the zero-action-cost solution.** The winning structure
+reuses the function machinery instead of building new states: the case
+alternative's binding branch (branch 3) gained a *guard-first* variant —
+`pattern` then `guard_equation` (the function's own rule) then an optional
+repeat of guard bindings/bodies/equations. `guard_equation` already pushes
+its body block (`| cond` + `_layout_start` + deeper `->`/`=` bodies +
+`_layout_end`), so the scanner delivers a continuation guard as a dedent +
+direct `|` — no new `_pipe`-after-body acceptance is needed anywhere.
+Measured cost: **+108 actions** (max action id 64932 -> 65040), resolved
+by `prec.left(1)` on the branch (no GLR conflict). The tree is the
+semantically correct shape: one `case_alternative` holding one
+`guard_equation` child per guard.
 
-**v1.2.3 partial mitigation:** `=>` error-handler definitions now parse
-(`name => expr` as a function body), and the old-style `=>` imports parse,
-which cut two of the ten regressed files (builddb 42 -> 31, CloogleServer
-53 -> 52) and improved Eastwood by a further 15.
+**v1.2.4 verification:** 0 overflows; corpus 73/73 (+2 regression tests:
+multi-guard alternative, module alias); total **2346 -> 2236** (−110, net
+**−712** vs v1.2.0) with **0 files regressed** vs v1.2.3 — coloured_line
+115 -> 35 (now *better* than v1.2.0's 55), CloogleServer 200 -> 191,
+PmCleanSystem 55 -> 45, Pass_DocError 19 -> 8.
 
-## 6. ~~`=>` qualified imports and `as` aliases~~ — FIXED in v1.2.3 (partially)
+## 6. ~~`=>` qualified imports and `as` aliases~~ — FIXED in v1.2.3 + v1.2.4
 
-**Status: the `=>` forms are fixed; the `as` alias form remains open.**
+**Status: fully fixed.**
 
 - `import M => qualified x, y` (the old qualified form, 5 real uses:
   CloogleServer.icl, builddb.icl, Symbol.icl, test_LanguageServerTests.icl,
@@ -346,9 +354,13 @@ which cut two of the ten regressed files (builddb 42 -> 31, CloogleServer
   `subscript_error => abort "..."`) now parse as a function with an `=>`
   body instead of the old silent mis-parse (`name = > expr`).
 
-Still open: the `as` alias form (`import M as N`). `as` cannot be reserved
-because it is a stdlib parameter name (`zip2 as bs`); no real corpus use
-of the alias form exists, so it is low priority.
+**v1.2.4: the `as` alias form is fixed too.** `import qualified M as N`
+(3 real uses: CloogleServer.icl, PmCleanSystem.icl, Pass_DocError.icl)
+now parses with `module` and `alias` fields, via an import-context literal
+`"as"` — the same mechanism as `qualified`: `as` is only a literal in the
+import state, so stdlib parameter uses (`zip2 as bs`) lex as identifiers
+and are unaffected (verified). Cost: +96 actions (max action id 65040 ->
+65136, well within budget).
 
 ## 7. ~~Single-quoted qualified names: `'Data.Error'.isError`~~ — FIXED in v1.2.2
 

@@ -2188,6 +2188,16 @@
     "type": "import_declaration",
     "named": true,
     "fields": {
+      "alias": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "module_name",
+            "named": true
+          }
+        ]
+      },
       "module": {
         "multiple": true,
         "required": true,
@@ -4547,6 +4557,10 @@
   {
     "type": "arrow",
     "named": true
+  },
+  {
+    "type": "as",
+    "named": false
   },
   {
     "type": "backtick_operator",

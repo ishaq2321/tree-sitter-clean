@@ -22,3 +22,23 @@ subscript_error => abort "Subscript error in !!||,index too large"
     body: (application
       function: (identifier)
       argument: (string))))
+
+==================
+Qualified Import with Module Alias
+==================
+import qualified Data.Foldable as Foldable
+import qualified Clyde.Process as SP
+---
+(source_file
+  (import_declaration
+    module: (module_name
+      (module_identifier)
+      (module_identifier))
+    alias: (module_name
+      (module_identifier)))
+  (import_declaration
+    module: (module_name
+      (module_identifier)
+      (module_identifier))
+    alias: (module_name
+      (module_identifier))))
