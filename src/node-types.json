@@ -302,6 +302,10 @@
         "named": true
       },
       {
+        "type": "parenthesized_operator",
+        "named": true
+      },
+      {
         "type": "question_type",
         "named": true
       },
@@ -1029,7 +1033,7 @@
     "named": true,
     "fields": {},
     "children": {
-      "multiple": false,
+      "multiple": true,
       "required": true,
       "types": [
         {
@@ -1297,6 +1301,10 @@
             "named": true
           },
           {
+            "type": "parenthesized_operator",
+            "named": true
+          },
+          {
             "type": "question_type",
             "named": true
           },
@@ -1369,6 +1377,10 @@
         "multiple": false,
         "required": true,
         "types": [
+          {
+            "type": "constructor",
+            "named": true
+          },
           {
             "type": "identifier",
             "named": true
@@ -1477,6 +1489,10 @@
         },
         {
           "type": "list_type",
+          "named": true
+        },
+        {
+          "type": "parenthesized_operator",
           "named": true
         },
         {
@@ -2218,6 +2234,10 @@
           "named": true
         },
         {
+          "type": "backtick_operator",
+          "named": true
+        },
+        {
           "type": "builtin_question_type",
           "named": true
         },
@@ -2299,6 +2319,10 @@
         },
         {
           "type": "range_operator",
+          "named": true
+        },
+        {
+          "type": "record_subset",
           "named": true
         },
         {
@@ -2563,6 +2587,10 @@
           },
           {
             "type": "list_type",
+            "named": true
+          },
+          {
+            "type": "parenthesized_operator",
             "named": true
           },
           {
@@ -3306,6 +3334,10 @@
           "named": true
         },
         {
+          "type": "parenthesized_operator",
+          "named": true
+        },
+        {
           "type": "question_marker",
           "named": true
         },
@@ -3461,6 +3493,21 @@
     }
   },
   {
+    "type": "record_subset",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "record_update",
     "named": true,
     "fields": {
@@ -3610,6 +3657,10 @@
             "named": true
           },
           {
+            "type": "parenthesized_operator",
+            "named": true
+          },
+          {
             "type": "question_type",
             "named": true
           },
@@ -3726,6 +3777,10 @@
           "named": true
         },
         {
+          "type": "parenthesized_operator",
+          "named": true
+        },
+        {
           "type": "question_type",
           "named": true
         },
@@ -3839,6 +3894,10 @@
         },
         {
           "type": "list_type",
+          "named": true
+        },
+        {
+          "type": "parenthesized_operator",
           "named": true
         },
         {
@@ -4262,6 +4321,10 @@
           "named": true
         },
         {
+          "type": "parenthesized_operator",
+          "named": true
+        },
+        {
           "type": "question_type",
           "named": true
         },
@@ -4349,6 +4412,10 @@
         },
         {
           "type": "list_type",
+          "named": true
+        },
+        {
+          "type": "parenthesized_operator",
           "named": true
         },
         {

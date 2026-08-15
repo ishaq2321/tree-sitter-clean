@@ -339,13 +339,19 @@ module.exports = grammar({
       choice(
         seq(
           optional("::"),
-          choice($.identifier, $.constructor, $._operator_symbol),
+          choice($.identifier, $.constructor, $._operator_symbol, $.backtick_operator),
           // `:: TypeCode (..)` / `:: Date{..}` — the all-members suffix.
           // `(..)` lexes as one token; `{..}` is the record all-fields form
           // (`from StdLibMisc import :: Date{..}`).
           optional(choice(
             $.parenthesized_operator,
             seq("{", $.range_operator, "}"),
+            // `:: Type{field1,field2}` — record-subset imports: import a
+            // record type with only the listed fields (`:: ClassDef{class_ident,
+            // class_pos}`). Field names are lowercase, so they lex as
+            // identifiers; the `{` shift is isolated by this named rule from
+            // the shared record/layout states.
+            $.record_subset,
             // `:: MaybeError (Ok)` — constructor-subset imports. A dedicated
             // named rule (like class_method_name) keeps its `(` shift
             // isolated from the shared parenthesized_name/paren states.
@@ -450,10 +456,30 @@ module.exports = grammar({
         ),
       ),
 
-    // `(zero)` — a method name in a class import, isolated from the shared
-    // parenthesized_name rule so its `(` shift cannot pollute unrelated
-    // states (instance heads, signature names).
-    class_method_name: ($) => seq("(", $.identifier, ")"),
+    // `(zero)` / `(concat,join,toLowerCase)` — method name(s) in a class
+    // import (`class Text(join,startsWith)` imports only the listed
+    // members), isolated from the shared parenthesized_name rule so its `(`
+    // shift cannot pollute unrelated states (instance heads, signature
+    // names).
+    class_method_name: ($) =>
+      seq(
+        "(",
+        $.identifier,
+        repeat(seq(",", $.identifier)),
+        ")",
+      ),
+
+    // `{field1,field2}` — a record-subset import (`:: ClassDef{class_ident,
+    // class_pos}`): import a record type with only the listed fields. Field
+    // names are lowercase (identifiers). Named rule so its `{` shift is
+    // isolated from the shared record-expression/layout states.
+    record_subset: ($) =>
+      seq(
+        "{",
+        $.identifier,
+        repeat(seq(",", $.identifier)),
+        "}",
+      ),
 
     // `(Ok)` / `(Ok, Err)` — a constructor-subset import (`:: MaybeError (Ok)`):
     // import only the listed constructors of a type. Constructors are
@@ -563,7 +589,8 @@ module.exports = grammar({
     type_definition: ($) =>
       seq(
         choice(
-        // `:: T a = RHS` / `:: T a :== RHS` — parametrized, must have a body
+        // `:: T a = RHS` / `:: T a :== RHS` — parametrized, must have a body.
+        // Parameters may carry uniqueness (`:: * Input *a = ...`).
         prec.left(2,
           seq(
             "::",
@@ -715,6 +742,9 @@ module.exports = grammar({
         $.array_type,
         $.type_paren,
         $.unit_type,
+        // `(->)` / `(+)` — parenthesised operator as a type constructor
+        // (`instance Functor ((->) r)`, `f :: (->) a b`).
+        $.parenthesized_operator,
         $.question_type,
         $.builtin_question_type,
         $.generic_kind_type,
@@ -939,12 +969,17 @@ module.exports = grammar({
         $._type,
       ),
 
-    // `derive g [a]` / `derive g []` / `derive g (->)`
+    // `derive g [a]` / `derive g []` / `derive g (->)` — the generic
+    // function name is an identifier for user generics but a constructor for
+    // the built-in ones (`derive JSONEncode Kind, Type, RequestCacheKey` —
+    // the real cloogle idiom derives several types in one declaration,
+    // comma-separated).
     derive_declaration: ($) =>
       seq(
         "derive",
-        field("name", $.identifier),
-        repeat1(choice($._type_atom, $.parenthesized_operator)),
+        field("name", choice($.identifier, $.constructor)),
+        repeat1($._type_atom),
+        repeat(seq(",", repeat1($._type_atom))),
       ),
 
     // `special a=Int` (with `a=Char` on deeper lines) — specialization

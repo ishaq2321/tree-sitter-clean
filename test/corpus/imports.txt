@@ -42,3 +42,74 @@ import qualified Clyde.Process as SP
       (module_identifier))
     alias: (module_name
       (module_identifier))))
+
+==================
+Derive declaration with multiple types
+==================
+
+module builddb
+
+derive JSONEncode Kind, Type, RequestCacheKey, TypeRestriction
+derive JSONDecode LogEntry
+
+---
+
+(source_file
+  (module_declaration
+    name: (module_name
+      (module_identifier)))
+  (derive_declaration
+    name: (constructor)
+    (constructor)
+    (constructor)
+    (constructor)
+    (constructor))
+  (derive_declaration
+    name: (constructor)
+    (constructor)))
+
+==================
+Backtick Operator Import
+==================
+from Data.Func import $, hyperstrict, instance Functor ((->) r), mapSt, seqSt, on, `on`
+---
+(source_file
+  (import_declaration
+    module: (module_name
+      (module_identifier)
+      (module_identifier))
+    (operator)
+    (identifier)
+    (constructor)
+    (type_paren
+      (type_application
+        (parenthesized_operator)
+        (type_variable
+          (identifier))))
+    (identifier)
+    (identifier)
+    (identifier)
+    (backtick_operator)))
+==================
+Class Import with Member List and Record Subset
+==================
+from Text import class Text(join,startsWith), instance Text String
+from syntax import :: ClassDef{class_ident,class_pos}
+---
+(source_file
+  (import_declaration
+    module: (module_name
+      (module_identifier))
+    (constructor)
+    (class_method_name
+      (identifier)
+      (identifier))
+    (constructor)
+    (constructor))
+  (import_declaration
+    module: (module_name
+      (module_identifier))
+    (constructor)
+    (record_subset
+      (identifier)
+      (identifier))))
