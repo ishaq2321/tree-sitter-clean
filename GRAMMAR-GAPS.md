@@ -14,11 +14,11 @@ a whole-file `ERROR` wrapper where the file previously parsed with local
 errors. Every rejected approach below was rejected for exactly this reason,
 measured on the full suite, not on isolated probes.
 
-The current verified baseline (master, post-v1.2.3): corpus **73/73**;
-Eastwood (63 `.icl` + `.dcl` files) **813 ERROR nodes** (headline
-`EastwoodCleanLanguageServer.icl`: **110**); clean-stdlib root `Std*`
-files (25) **0/0**; Clyde+cloogle **1423**; total across all 151 corpus
-files **2236** (was 2948 at v1.2.0, net **-712**); **0 action-table
+The current verified baseline (master, post-716051f): corpus **76/76**;
+Eastwood (63 `.icl` + `.dcl` files) **711 ERROR nodes** (headline
+`EastwoodCleanLanguageServer.icl`: **109**); clean-stdlib root `Std*`
+files (25) **0/0**; Clyde+cloogle **1328**; total across all 151 corpus
+files **2039** (was 2948 at v1.2.0, net **-909**); **0 action-table
 overflows**. (The v1.2.1 figures below — 60/60, 1897 Eastwood, 1786
 Clyde+cloogle — were measured on a smaller file selection and are
 superseded by the above, which is apples-to-apples against the previous
@@ -433,3 +433,38 @@ git worktree add /tmp/ts-head HEAD
 cd /tmp/ts-head && ln -s /home/ishaq2321/tree-sitter-clean/node_modules node_modules
 npx tree-sitter generate && cc -shared -fPIC -O2 -I src -o /tmp/clean_head.so src/parser.c src/scanner.c
 ```
+
+## 7. New fixes in 716051f (post-v1.2.3, for v1.2.4)
+
+Verified on the full 151-file corpus (0 regressions, 0 overflows, 76/76
+corpus tests, deterministic):
+
+- **`class` import member lists** — `class Text(concat,join,toLowerCase)`:
+  `class_method_name` now accepts a comma-separated list of identifiers
+  (previously only a single `(name)`).
+- **Record-subset imports** — `:: ClassDef{class_ident,class_pos}`: new
+  `record_subset` rule (isolated `{` shift) for importing a record type
+  with only listed fields.
+- **Backtick-operator imports** — `from Data.Func import ..., `on``: the
+  plain import branch now accepts `backtick_operator`.
+- **`(->)` / `(+)` as type atoms** — `instance Functor ((->) r)` and
+  `f :: (->) a b`: `parenthesized_operator` added to `_type_atom`; the
+  derive rule was simplified (its `parenthesized_operator` branch became
+  redundant) to avoid the resulting conflict.
+- **`derive` with comma-separated types** — `derive JSONEncode Kind, Type,
+  RequestCacheKey`: name accepts constructors, types may be comma-listed.
+
+Net effect vs v1.2.3: total **2236 -> 2039** (−197; **−909** vs v1.2.0),
+PmCleanSystem 45 -> 14, Symbol.icl 109 -> 71, CloogleServer 191 -> 155,
+builddb 71 -> 49, SemVer.dcl 6 -> 0, GoToModule1 33 -> 20.
+
+### Rejected: uniqueness-typed type-synonym parameters
+
+`:: * Input *a = ...` (PmParse:17) — extending the synonym's parameter list
+to accept `uniqueness_type` / `* type_variable` (direct choice, named
+`_type_parameter` rule, and prec(1)-resolved named rule) each shifted the
+parse-table state for **where-block case alternatives with `?` patterns**
+(`?Just infos = ... | ?None = False`), silently dropping the second
+alternative and adding **+2 ERROR nodes in LanguageServerTests.icl**
+(82 -> 84) for a −3 gain (PmParse −2, Symbol −1). Reverted: net loss. The
+fix would need the where-block case continuation to be robust first.
