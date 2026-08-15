@@ -14,7 +14,7 @@
     }
   ],
   "metadata": {
-    "version": "1.2.0",
+    "version": "1.2.3",
     "license": "MIT",
     "description": "Clean grammar for tree-sitter",
     "authors": [
