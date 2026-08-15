@@ -1,0 +1,26 @@
+
+==================
+Pipe-Containing Operator
+==================
+a = x ++| y
+---
+(source_file
+  (function_declaration
+    name: (identifier)
+    body: (binary_expression
+      (identifier)
+      operator: (operator_pipe)
+      (identifier))))
+
+==================
+Generic Kind Expression
+==================
+bx = bimap{|*|}
+---
+(source_file
+  (function_declaration
+    name: (identifier)
+    body: (application
+      function: (identifier)
+      argument: (kind_expression
+        kind: (operator_mul)))))

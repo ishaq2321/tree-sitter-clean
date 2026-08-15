@@ -678,6 +678,10 @@
             "named": true
           },
           {
+            "type": "operator_pipe",
+            "named": true
+          },
+          {
             "type": "strict_equal",
             "named": true
           },
@@ -876,6 +880,10 @@
         },
         {
           "type": "operator_or",
+          "named": true
+        },
+        {
+          "type": "operator_pipe",
           "named": true
         },
         {
@@ -1081,6 +1089,10 @@
         },
         {
           "type": "operator_or",
+          "named": true
+        },
+        {
+          "type": "operator_pipe",
           "named": true
         },
         {
@@ -1706,6 +1718,10 @@
             "named": true
           },
           {
+            "type": "operator_pipe",
+            "named": true
+          },
+          {
             "type": "parenthesized_name",
             "named": true
           },
@@ -1844,6 +1860,10 @@
       "types": [
         {
           "type": "generator_sep",
+          "named": true
+        },
+        {
+          "type": "operator_pipe",
           "named": true
         }
       ]
@@ -2248,6 +2268,10 @@
           "named": true
         },
         {
+          "type": "operator_pipe",
+          "named": true
+        },
+        {
           "type": "parenthesized_operator",
           "named": true
         },
@@ -2470,6 +2494,10 @@
         },
         {
           "type": "operator_or",
+          "named": true
+        },
+        {
+          "type": "operator_pipe",
           "named": true
         },
         {
@@ -3402,6 +3430,10 @@
         {
           "type": "_pattern",
           "named": true
+        },
+        {
+          "type": "constructor",
+          "named": true
         }
       ]
     }
@@ -4025,6 +4057,10 @@
         "types": [
           {
             "type": "operator",
+            "named": true
+          },
+          {
+            "type": "operator_pipe",
             "named": true
           }
         ]
@@ -4674,6 +4710,10 @@
   },
   {
     "type": "operator_or",
+    "named": true
+  },
+  {
+    "type": "operator_pipe",
     "named": true
   },
   {

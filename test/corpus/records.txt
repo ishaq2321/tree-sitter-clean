@@ -40,3 +40,32 @@ f p = p.name
     body: (field_access
       record: (identifier)
       field: (identifier))))
+
+==================
+Record Update by Type Name
+==================
+f sc = { ServerCapabilities | textDocumentSync = 1 }
+---
+(source_file
+  (function_declaration
+    name: (identifier)
+    pattern: (identifier)
+    body: (record_update
+      record: (constructor)
+      field: (update_field
+        (identifier))
+      value: (number
+        (integer)))))
+
+==================
+Record Pattern by Type Name
+==================
+f { WorkspaceFolder | uri } = uri
+---
+(source_file
+  (function_declaration
+    name: (identifier)
+    pattern: (record_pattern
+      (constructor)
+      field: (identifier))
+    body: (identifier)))

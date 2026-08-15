@@ -1314,10 +1314,14 @@ module.exports = grammar({
       ),
 
     // `{ x = a, y = b }` — also the shorthand `{x, y}` (= `{x = x, y = y}`)
+    // `{ T | x = a, y }` — record pattern by TYPE NAME (`{WorkspaceFolder | uri}`)
     record_pattern: ($) =>
       seq(
         "{",
-        $._record_pattern_members,
+        choice(
+          $._record_pattern_members,
+          seq($.constructor, $._pipe, $._record_pattern_members),
+        ),
         "}",
       ),
 
@@ -1424,15 +1428,16 @@ module.exports = grammar({
         prec.right(PREC.CONSTRUCTOR, seq($._expression, field("operator", $.operator_cons_strict), $._expression)),
         // backtick-quoted infix operator: `x `bind` y`
         prec.left(PREC.ADD, seq($._expression, field("operator", $.backtick_operator), $._expression)),
-        // generic fallback for any other operator symbol
-        prec.left(PREC.ADD, seq($._expression, field("operator", $.operator), $._expression)),
+        // generic fallback for any other operator symbol (including
+        // `|`-containing operators like `++|`, `<|-` — see operator_pipe)
+        prec.left(PREC.ADD, seq($._expression, field("operator", choice($.operator, $.operator_pipe)), $._expression)),
         // dot operators (`x +++. y` — the stdlib's string append `+++.`)
         prec.left(PREC.ADD, seq($._expression, field("operator", $.operator_dot), $._expression)),
       ),
 
     // `~expr` — negation
     unary_expression: ($) =>
-      prec(PREC.UNARY, seq(field("operator", $.operator), $._expression)),
+      prec(PREC.UNARY, seq(field("operator", choice($.operator, $.operator_pipe)), $._expression)),
 
     // Function application binds tighter than every operator. The function
     // position also accepts field/index accesses so `r.f x` (= `(r.f) x`)
@@ -1692,7 +1697,7 @@ module.exports = grammar({
     generator: ($) =>
       seq(
         field("pattern", $._pattern),
-        $.generator_sep,
+        choice($.generator_sep, $.operator_pipe),
         field("expression", $._expression),
       ),
 
@@ -1731,7 +1736,13 @@ module.exports = grammar({
       seq(
         "{",
         field("record", $._expression),
-        "&",
+        // `&` updates a record variable (`{ rec & f = v }`); `|` updates a
+        // record by TYPE NAME (`{ ServerCapabilities | f = v }`). One rule
+        // for both: reusing the `&`-rule states keeps the action table small.
+        // The `|` needs prec(2): the generic `operator` token (prec 1) also
+        // matches `|`, and in a tie the lexer picks the higher precedence —
+        // without this, `{ T | f = v }` lexes `|` as an operator.
+        choice("&", $._pipe),
         $._record_update_fields,
         "}",
       ),
@@ -1944,6 +1955,7 @@ module.exports = grammar({
         // bare `*` names (`instance * Int`, `infixl 6 *`)
         $.uniqueness_star,
         $.operator,
+        $.operator_pipe,
         $.operator_dot,
       ),
 
@@ -1995,9 +2007,8 @@ module.exports = grammar({
     // precedence 2 beats the catch-all `operator` (prec 1) at equal length,
     // and it covers `?#`, which the operator alphabet cannot lex at all
     // (`#` is not an operator symbol).
-    question_marker: ($) => token(prec(2, choice("?", "?^", "?#", "?|"))),
+    question_marker: ($) => token(prec(13, choice("?", "?^", "?#", "?|"))),
 
-    // `*` — the uniqueness attribute star. High lexical precedence so it beats
     // `*` — the uniqueness attribute star. High lexical precedence so it beats
     // `operator_mul` and the generic `operator` catch-all in every state; bare
     // `*` never starts a multi-char operator in real Clean code (all `**`/
@@ -2023,7 +2034,25 @@ module.exports = grammar({
     // a unary operator. `||` (operator_or) is longer, so it still wins.
     _pipe: ($) => token(prec(2, "|")),
 
-    operator: ($) => token(prec(1, /[~%^*+\-\\<>\/?|$]+/)),
+    operator: ($) => token(prec(1, /[~%^*+\-\\<>\/?$]+/)),
+
+    // Operators CONTAINING a `|` (`++|`, `<|-`, `<|>`, `++||`) — a dedicated
+    // token so a LONE `|` stays `_pipe` (record updates `{ T | f = v }`,
+    // guards, comprehensions, ADT separators). The regex requires at least one
+    // non-`|` char (`++|`, `<|-`, `|+`), so a bare `|` or `||` never matches.
+    // prec(12) beats generator_sep (10): without it, `<-` completes first and
+    // the DFA prunes the `<|-` continuation (prefer_transition).
+    operator_pipe: ($) =>
+      token(
+        prec(
+          12,
+          // `|`-containing operators with a LEADING non-`|` char (`++|`,
+          // `<|-`, `<|>`, `++||`). A pipe-leading run (`|*` in `{|*|}`, a
+          // lone `||`) must stay `_pipe`/`operator_or`, so the regex requires
+          // at least one leading operator char.
+          /[~%^*+\-\\<>\/?$]+\|[~%^*+\-\\<>\/?|$]*/,
+        ),
+      ),
 
     // `x +++. y` — operators containing a `.` (e.g. the stdlib's string
     // append `+++.`). Requires at least one leading operator character so a

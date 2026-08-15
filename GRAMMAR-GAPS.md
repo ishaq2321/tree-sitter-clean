@@ -197,11 +197,11 @@ emitted at every deeper line). Requires the same member/separator
 mechanism as #2 plus a binding-lookahead heuristic — both blocked by the
 same walls.
 
-## 5. Record update by type name: `{ T | field = value, ... }`
+## 5. ~~Record update by type name: `{ T | field = value, ... }`~~ — FIXED in v1.2.3
 
-Eastwood constructs records with the type-name pipe form (the main
-remaining source of its errors — the whole-file wrapper in
-`EastwoodCleanLanguageServer.icl` starts at this definition):
+Eastwood constructs records with the type-name pipe form (previously the
+main remaining source of its errors — the whole-file wrapper in
+`EastwoodCleanLanguageServer.icl` started at this definition):
 
 ```clean
 { ServerCapabilities
@@ -210,22 +210,57 @@ remaining source of its errors — the whole-file wrapper in
 }
 ```
 
-**Failed approaches (all measured on the full build, not probes):**
+**How it was fixed.** The pipe is a dedicated `_pipe` token (prec 2, used
+for ADTs/guards/comprehensions), and `record_update` accepts
+`choice("&", $._pipe)` — one rule for by-variable (`{ r & f = v }`) and
+by-type-name (`{ T | f = v }`) updates, reusing the `&`-rule's states.
 
-- A dedicated `record_update_by_type` rule (`{` + `constructor` + `_pipe`
-  + field list) wired into `_expression_atom` — **199 overflow warnings**.
-  (The unwired rule measured ~0 because dead rules are pruned before table
-  generation — a dead-code measurement that misled early.)
-- The same rule with literal-only field values — **13468 overflows**: the
-  cost is the `|` after a constructor merging with the guard/context/
-  comprehension pipe states, not the value expression.
-- A dedicated pipe token / literal `"|"` / precedence tweaks — no help:
-  the `{`-opener context is already shared by record_expression,
-  record_update, record_pattern, array_expression and both
-  comprehensions; any new `{`-form forks all of them.
+The blocker was the 16-bit action table. `_pipe` after an *expression*
+(`{ expr | ... }`) coexists with the generic `operator` token (which
+historically contained `|`), doubling the action rows in that state and
+overflowing the table (976 warnings). The fix removes `|` from the generic
+`operator` alphabet entirely and introduces `operator_pipe` (prec 12) for
+`|`-*containing* operators (`++|`, `<|-`, `<|>`, `++||`), with a regex that
+requires a leading non-`|` char so a lone `|` / `||` / `|*` never matches
+it. `|` now always lexes as `_pipe` (separators) or `operator_or` (`||`).
 
-Fitting this needs more headroom (a larger refactor like section 0's) or
-a tree-sitter version with wider action encoding.
+**Verified (v1.2.3):** 0 overflow warnings; corpus 68/68; the maintainer's
+`EastwoodCleanLanguageServer.icl` dropped from **180 → 110 errors** (all
+remaining errors are the multi-guard case gap below); `{ T | f = v }` in
+expression, argument and tuple positions all parse as `record_update`.
+
+## 5b. Multi-guard case alternatives: `case x of p | c1 -> b1 | c2 -> b2` — NEW GAP (v1.2.3 regression)
+
+A case alternative whose guard list continues on later lines (common in
+Clyde's `coloured_line.icl`, `CloogleServer.icl`, `builddb.icl` and a few
+Eastwood test files):
+
+```clean
+case parse_state of
+	_
+		| isDigit line.[i]
+			-> pL {state & parse_state = Precedence} end
+		| isLower line.[i]
+			-> pL {state & parse_state = Other} end
+```
+
+The continuation guard (`| c2 -> b2` after a completed `| c1 -> b1`) sits
+in a deeper layout block. Before v1.2.3 the `|` lexed as part of the
+generic `operator` and the continuation was silently swallowed as a binary
+operator of the previous body (wrong tree, no error). After removing `|`
+from the generic operator, the continuation lexes as `_pipe` and errors,
+**regressing 10 files by a total of +187 errors** (net across all 151
+corpus files is still **-567**).
+
+**Failed fixes (all measured):** extending `case_alternative` with a
+guard-continuation `repeat` — the scanner's `_layout_start` before each
+continuation is ambiguous with the case block's nested-alternative layout,
+the required `[$.case_alternative]` self-conflict explodes GLR (parses hang
+on even `module M`), `prec.left` resolves it but grows the table so large
+parsing stalls, and allowing `_pipe` as a binary operator (restoring the
+old swallow) overflows the table by 1346. A real fix needs the `_layout_start`
+ambiguity resolved at the scanner level or table headroom from a larger
+refactor.
 
 ## 6. `=>` qualified imports and `as` aliases
 
