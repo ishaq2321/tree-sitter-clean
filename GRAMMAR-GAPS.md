@@ -14,14 +14,15 @@ a whole-file `ERROR` wrapper where the file previously parsed with local
 errors. Every rejected approach below was rejected for exactly this reason,
 measured on the full suite, not on isolated probes.
 
-The current verified baseline (v1.2.1): corpus **60/60** (5 new import
-regression tests); Eastwood (36 `.icl` files) **1897 ERROR nodes vs 2238**
-on the previous grammar; clean-stdlib root `Std*` files (25) **0/0**;
-Clyde+cloogle (123 `.icl`/`.dcl` files) **1786 vs 1790**; **0 action-table
-overflows**. (The v1.2.0 baseline of 1833 across 120 files was measured on
-a slightly different corpus selection and is superseded by the above,
-which is apples-to-apples against the previous grammar on identical file
-lists.)
+The current verified baseline (v1.2.3): corpus **71/71**; Eastwood
+(63 `.icl` + `.dcl` files) **824 ERROR nodes** (headline
+`EastwoodCleanLanguageServer.icl`: **110**); clean-stdlib root `Std*`
+files (25) **0/0**; Clyde+cloogle **1522**; total across all 151 corpus
+files **2346** (was 2948 at v1.2.0, net **-602**); **0 action-table
+overflows**. (The v1.2.1 figures below — 60/60, 1897 Eastwood, 1786
+Clyde+cloogle — were measured on a smaller file selection and are
+superseded by the above, which is apples-to-apples against the previous
+grammar on identical file lists.)
 
 ## Root cause: the 65536-entry action-table limit
 
@@ -282,16 +283,72 @@ from a larger refactor.
 which cut two of the ten regressed files (builddb 42 -> 31, CloogleServer
 53 -> 52) and improved Eastwood by a further 15.
 
-## 6. `=>` qualified imports and `as` aliases
+**v1.2.4 investigation — the cost is quantified, and it is a pure
+action-budget wall, not a grammar-design problem.** Every structural
+variant of the continuation was measured (max generated action id vs the
+65535 limit; the released v1.2.3 grammar sits at **64932**, headroom
+**603**):
 
-`StdOverloadedList.icl` (currently a 0-error stdlib file) contains
-`import StdOverloadedList => qualified subscript_error, ...` — a *third*
-qualified form. Today `=>` lexes as `=` + `>` (a bare `=` is not in the
-operator alphabet), so the import false-passes with a wrong tree in some
-positions and errors in others. The `as` alias form (`import M as N`) is
-the same family; `as` cannot be reserved because it is a stdlib
-parameter name (`zip2 as bs`). Both remain open; they are not in the
-maintainer-reported Eastwood file.
+| Variant (all on the v1.2.3 baseline) | max action id | delta |
+|---|---|---|
+| baseline (v1.2.3) | 64932 | — |
+| `prec.right(2)` on the plain guard branch (no continuation) | 63310 | **-1622** |
+| + inline `repeat(seq(_pipe, cond, arrow, body))` | 74480 | +9548 vs plain |
+| + inline repeat with bare-`->` multi-body option | 79265 | +15955 |
+| + `case_guarded` rule + repeat (continuation isolated) | 78712 | +15402 |
+| + `repeat(_pipe)` (bare pipe only, isolates the token cost) | 73145 | +9835 |
+| + `repeat(arrow)` (bare arrow only) | 76575 | +13265 |
+| nested-body-block (pushes the guard level, continuation dedents) | 82629 | +17697 |
+| same, `prec.right` instead of GLR | 79720 | +14788 |
+| same, single-member block + GLR | 81733 | +14801 |
+
+Key facts established:
+
+1. **The token acceptance after the case body is the whale.** Adding
+   `_pipe` (or `arrow`) to the body-completion state costs ~**10-13k**
+   actions because that state is shared with every expression completion
+   in the grammar; the merged states all get new action signatures. No
+   structural rearrangement (separate rule, isolated states, pushed
+   blocks, GLR vs precedence) avoids it.
+2. **`_layout_start` acceptance is even worse** (97MB tables, generate
+   timeouts, GLR hangs) — confirmed again.
+3. **The escape hatch does not exist yet:** tree-sitter **0.25.1** (latest
+   CLI, 2026) still generates `const uint16_t *parse_table` — the 16-bit
+   action encoding is unchanged since 0.24.7. Upgrading the CLI does not
+   widen the ceiling.
+4. The only measurable saving found is `prec.right(2)` on the case guard
+   branch (~1.6k actions, by resolving existing GLR forks statically); it
+   is far short of the ~10k needed.
+
+Conclusion: closing this gap requires freeing ~10k actions elsewhere
+(a major automaton refactor — the v1.2.1 record-member extraction bought
+only ~500) or a future tree-sitter with a wider action encoding. Both are
+multi-week efforts with uncertain payoff; the gap is documented so a
+future attempt starts from these numbers.
+
+**v1.2.3 partial mitigation:** `=>` error-handler definitions now parse
+(`name => expr` as a function body), and the old-style `=>` imports parse,
+which cut two of the ten regressed files (builddb 42 -> 31, CloogleServer
+53 -> 52) and improved Eastwood by a further 15.
+
+## 6. ~~`=>` qualified imports and `as` aliases~~ — FIXED in v1.2.3 (partially)
+
+**Status: the `=>` forms are fixed; the `as` alias form remains open.**
+
+- `import M => qualified x, y` (the old qualified form, 5 real uses:
+  CloogleServer.icl, builddb.icl, Symbol.icl, test_LanguageServerTests.icl,
+  StdOverloadedList.icl's error handler) now parses as a proper
+  `import_declaration` with the `=>`-listed items. The `qualified` marker
+  is an anonymous keyword (dropped from the tree), consistent with
+  `import qualified M` and `from M import qualified x` — verified the
+  trees are identical in shape to the other qualified forms.
+- `name => expr` error-handler definitions (StdOverloadedList.icl's
+  `subscript_error => abort "..."`) now parse as a function with an `=>`
+  body instead of the old silent mis-parse (`name = > expr`).
+
+Still open: the `as` alias form (`import M as N`). `as` cannot be reserved
+because it is a stdlib parameter name (`zip2 as bs`); no real corpus use
+of the alias form exists, so it is low priority.
 
 ## 7. ~~Single-quoted qualified names: `'Data.Error'.isError`~~ — FIXED in v1.2.2
 
