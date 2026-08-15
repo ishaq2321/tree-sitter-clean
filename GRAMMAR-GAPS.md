@@ -224,10 +224,12 @@ overflowing the table (976 warnings). The fix removes `|` from the generic
 requires a leading non-`|` char so a lone `|` / `||` / `|*` never matches
 it. `|` now always lexes as `_pipe` (separators) or `operator_or` (`||`).
 
-**Verified (v1.2.3):** 0 overflow warnings; corpus 68/68; the maintainer's
-`EastwoodCleanLanguageServer.icl` dropped from **180 → 110 errors** (all
-remaining errors are the multi-guard case gap below); `{ T | f = v }` in
-expression, argument and tuple positions all parse as `record_update`.
+**Verified (v1.2.3):** 0 overflow warnings; corpus 71/71 (the `=>` import,
+error-handler and higher-kinded-kind fixes added 3 tests); the
+maintainer's `EastwoodCleanLanguageServer.icl` dropped from **180 → 110
+errors**; `{ T | f = v }` in expression, argument and tuple positions all
+parse as `record_update`; total corpus errors **2948 → 2346** (−602)
+across 151 files (Std* 0).
 
 ## 5b. Multi-guard case alternatives: `case x of p | c1 -> b1 | c2 -> b2` — NEW GAP (v1.2.3 regression)
 
@@ -257,10 +259,28 @@ guard-continuation `repeat` — the scanner's `_layout_start` before each
 continuation is ambiguous with the case block's nested-alternative layout,
 the required `[$.case_alternative]` self-conflict explodes GLR (parses hang
 on even `module M`), `prec.left` resolves it but grows the table so large
-parsing stalls, and allowing `_pipe` as a binary operator (restoring the
-old swallow) overflows the table by 1346. A real fix needs the `_layout_start`
-ambiguity resolved at the scanner level or table headroom from a larger
-refactor.
+parsing stalls (parser.c 55MB -> 97MB, cc takes >10min), `prec.right`
+likewise grows the table (97MB), `optional($._layout_start)`-after-pattern
+restructuring (to make the scanner push the guard level so the
+continuation dedents like the working function case) explodes the table
+by **21436 overflows**, and allowing `_pipe` as a binary operator
+(restoring the old swallow) overflows by 1346.
+
+**Root cause of the bloat:** the continuation's `_layout_start` enters the
+lookahead of the case-alternative body-completion state, a high-fan-in
+state reached after every guarded alternative in the grammar; any
+acceptance of `_layout_start` there forks its reduce paths globally. The
+scanner cannot distinguish the case continuation (deeper `|`-line after a
+completed body, stack top = case block) from a function's nested guard
+(deeper `|`-line after a condition, same stack shape) — both emit
+LAYOUT_START from an identical indent state. A real fix needs the
+`_layout_start` ambiguity resolved at the scanner level or table headroom
+from a larger refactor.
+
+**v1.2.3 partial mitigation:** `=>` error-handler definitions now parse
+(`name => expr` as a function body), and the old-style `=>` imports parse,
+which cut two of the ten regressed files (builddb 42 -> 31, CloogleServer
+53 -> 52) and improved Eastwood by a further 15.
 
 ## 6. `=>` qualified imports and `as` aliases
 
