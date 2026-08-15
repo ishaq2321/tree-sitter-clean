@@ -468,3 +468,12 @@ parse-table state for **where-block case alternatives with `?` patterns**
 alternative and adding **+2 ERROR nodes in LanguageServerTests.icl**
 (82 -> 84) for a −3 gain (PmParse −2, Symbol −1). Reverted: net loss. The
 fix would need the where-block case continuation to be robust first.
+
+### Rejected: root-level `#` bindings followed by a `|` guard
+
+`Start w` / `# (a,b) = g w` / `| isError a` — a col-0 let-before block whose
+guard comes after the FIRST binding works, but a guard after the SECOND
+binding is dropped (the parser reduces the function at the repeat1
+boundary). Real occurrences: CloogleServer:158 (`Start w`), test_Common.icl.
+The fix needs the same repeat1-continuation state surgery as the
+multi-guard wall (measured: no headroom in the 16-bit table); deferred.
