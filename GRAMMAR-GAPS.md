@@ -162,6 +162,52 @@ emit `LAYOUT_SEMICOLON` when the parser does not request it
 (`valid_symbols`); forcing it would be rejected. Requesting it requires the
 reduce action that only the (exploding) conflict provides.
 
+### v1.2.4+ investigation (reverted)
+
+Approaches A–C predate the scanner's deferred-layout mechanism (the
+`pending_block` step-2b path built for `special` blocks). Re-testing on the
+v1.2.4 grammar, the scanner CAN establish the group's level at the
+continuation column: add `$._inline_layout_start` to `guard_binding` — the
+scanner defers the level to the next line's column and emits a sibling
+`LAYOUT_SEMICOLON` there (exactly the `special a=Int` mechanism). With a
+`continuation_binding` member added to the binding branch, a **single**
+continuation followed by `= body` at EOF parses cleanly (`lookStr` shape:
+`#! (str,env) = objectGet...` then `= str`).
+
+Three blockers remain, each verified against the runtime/generator source:
+
+1. **The second continuation ends the repeat.** The binding branch's
+   `repeat1(seq(optional(sep), member))` has SEMICOLON in the repeat's
+   FOLLOW (the trailing `optional(sep)` after the repeat1), so after a
+   member the table pairs `REDUCE(aux_repeat)` with a `SHIFT_REPEAT` — and
+   the runtime always skips SHIFT_REPEAT
+   (`if (action.shift.repetition) break;` in `ts_parser__advance`), so the
+   reduce wins and the repeat ends after ONE continuation. `prec.right(N)`
+   on the repeat1 does not help: the repeat-continuation shift's
+   precedence comes from the recursive item's prev-step, not the wrapper.
+   The `member sep` order (mirroring `layoutBlockMembers`, where the
+   separator is consumed inside the iteration and continuation happens on
+   member starts) loses the FORCED first separator: the value-expression
+   application state then doesn't request SEMICOLON, and the first
+   continuation is absorbed as an argument. A layoutBlockMembers-style
+   final-member closer (`seq(member, choice(END, ";", SEMI))`) outside the
+   repeat keeps SEMICOLON out of the repeat's FOLLOW, but the final
+   member's first-token overlap with the repeat's members destabilized the
+   automaton (whole-file ERROR on the cbHandler probe).
+
+2. **The group's dedent LAYOUT_END has no consumer.** The scanner pushes
+   the group level at the continuation column; when the next line dedents
+   to the function's own column (`| result_ <> result_ = undef` after the
+   `result_ = writeInt ...` binding), it emits LAYOUT_END (step 4), and
+   `function_declaration` has no rule position that shifts it — the
+   function-end reduce (prec 0, left) beats any END shift (prec 0) at
+   build time, so the `|` guard errors.
+
+3. **`#` (vs `#!`) never requests the inline start.** The state after `#`
+   merges with `let_before_expression`'s `#` (which has no
+   `_inline_layout_start`), so `#`-only groups lack the deferred level
+   entirely; the corpus's real shapes all use `#!`, which works.
+
 ## 3. Dot-less strict array index `a![i]`
 
 Clyde writes strict array indexing without the dot:
