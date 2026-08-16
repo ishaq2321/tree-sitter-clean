@@ -1527,7 +1527,8 @@ module.exports = grammar({
     // (`a!.[i]`) sharing a record, the `!`-conflict is exactly `_expression`
     // vs `_record`; a separate anonymous record for index_access would make
     // the reduce-reduce three-way and the declared fork would never fire.
-    _record: ($) => choice($._expression_atom, $.field_access, $.application),
+    _record: ($) =>
+      choice($._expression_atom, $.field_access, $.index_access, $.application),
 
     // `record.field` or `record!field` (strict field access)
     field_access: ($) =>
@@ -1540,14 +1541,16 @@ module.exports = grammar({
         ),
       ),
 
-    // `array.[idx]` — array/element selection (strict form `array!.[idx]` too)
+    // `array.[idx]` — array/element selection (strict forms `array!.[idx]`
+    // and the dot-less `array![idx]` Clyde uses). The selector is the
+    // dotted `!.`/`.` OR the bare strict `!` — never a bare `[`, which must
+    // stay an application argument (`arr [i]`).
     index_access: ($) =>
       prec.left(
         PREC.ACCESS,
         seq(
           field("record", $._record),
-          optional("!"),
-          ".",
+          choice(seq(optional("!"), "."), "!"),
           "[",
           $._expression,
           "]",

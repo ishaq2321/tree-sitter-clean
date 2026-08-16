@@ -114,3 +114,42 @@ v = [1..10]
         (range_operator)
         (number
           (integer))))))
+
+==================
+Strict Array Index (dot-less)
+==================
+x = arr![i]
+y = arr!.[i]
+z = arr.[i]
+w = cache![mid].subdir
+v = arr [i]
+---
+(source_file
+  (function_declaration
+    name: (identifier)
+    body: (index_access
+      record: (identifier)
+      (identifier)))
+  (function_declaration
+    name: (identifier)
+    body: (index_access
+      record: (identifier)
+      (identifier)))
+  (function_declaration
+    name: (identifier)
+    body: (index_access
+      record: (identifier)
+      (identifier)))
+  (function_declaration
+    name: (identifier)
+    body: (field_access
+      record: (index_access
+        record: (identifier)
+        (identifier))
+      field: (identifier)))
+  (function_declaration
+    name: (identifier)
+    body: (application
+      function: (identifier)
+      argument: (list_expression
+        (identifier)))))

@@ -1577,6 +1577,10 @@
             "named": true
           },
           {
+            "type": "index_access",
+            "named": true
+          },
+          {
             "type": "kind_expression",
             "named": true
           },
@@ -2390,6 +2394,10 @@
           },
           {
             "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "index_access",
             "named": true
           },
           {

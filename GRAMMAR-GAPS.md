@@ -208,24 +208,36 @@ Three blockers remain, each verified against the runtime/generator source:
    `_inline_layout_start`), so `#`-only groups lack the deferred level
    entirely; the corpus's real shapes all use `#!`, which works.
 
-## 3. Dot-less strict array index `a![i]`
+## 3. ~~Dot-less strict array index `a![i]`~~ — FIXED
 
 Clyde writes strict array indexing without the dot:
-`subdirs![subdir_i]`, `arr![i]` (3 uses). The grammar's `index_access`
-requires `record!.[i]` or `record.[i]`; `a![i]` currently misparses as
-`field_access` with a MISSING field plus a list argument (no ERROR, wrong
-shape).
+`subdirs![subdir_i]`, `arr![i]`. The grammar's `index_access` required
+`record!.[i]` or `record.[i]`; `a![i]` misparsed as `field_access` with a
+MISSING field plus a list argument (no ERROR, wrong shape).
 
-**Failed approach — `choice("!.", "!", ".")` selector (no bare `[`):**
-fixed the construct but the `!` transition after expression atoms changed
-recovery in Console.icl 0 → 154 and flipped PmDirCache.icl from local
-errors (232) to a whole-file wrapper. Also risked breaking the
+**Failed approach (pre-v1.2.4) — `choice("!.", "!", ".")` selector (no
+bare `[`):** fixed the construct but the `!` transition after expression
+atoms changed recovery in Console.icl 0 → 154 and flipped PmDirCache.icl
+from local errors (232) to a whole-file wrapper. Also risked breaking the
 application `arr [i]` (which must stay an application — a bare `[` is a
 list argument). Reverted.
 
 **Note:** the earlier `optional("!")` + `optional(".")` variant made
 `arr[i]` (no selector at all) parse as `index_access`, which is wrong —
 Clean requires the `.`; bare `[` must remain application.
+
+**v1.2.4 fix:** `index_access` now takes the selector
+`choice(seq(optional("!"), "."), "!")` — the dotted `!.`/`.` or the bare
+strict `!`, never a bare `[`. The bare `!` no longer regresses recovery
+(verified against the pre-v1.2.4 failures; the spine-strict GLR fork now
+owns the `!` transition). A second, subtler change was required:
+`index_access` was added to `_record`, so `cache![mid].subdir_name`
+(field access on an index result, which PmDirCache.icl uses inside a
+`#`-group) chains — without it the now-correct `index_access` parse
+stranded the trailing `.field` and regressed PmDirCache +5. Corpus:
+**1374 vs 1378 committed** (−4, PmAbcMagic), **0 files regressed**; max
+action id 61283. New corpus test covers `a![i]`, `a!.[i]`, `a.[i]`,
+`a![i].field`, and bare `arr [i]` (still an application).
 
 ## 4. Deeper-column continuation bindings
 
