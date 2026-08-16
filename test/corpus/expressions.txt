@@ -153,3 +153,35 @@ v = arr [i]
       function: (identifier)
       argument: (list_expression
         (identifier)))))
+
+==================
+Bang Bang Index Operator
+==================
+x = args!!0
+y = l!!child
+z = [!!]
+w = a + b !! c
+---
+(source_file
+  (function_declaration
+    name: (identifier)
+    body: (binary_expression
+      (identifier)
+      (number
+        (integer))))
+  (function_declaration
+    name: (identifier)
+    body: (binary_expression
+      (identifier)
+      (identifier)))
+  (function_declaration
+    name: (identifier)
+    body: (list_expression))
+  (function_declaration
+    name: (identifier)
+    body: (binary_expression
+      (identifier)
+      operator: (operator_add)
+      (binary_expression
+        (identifier)
+        (identifier)))))

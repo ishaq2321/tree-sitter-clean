@@ -84,32 +84,45 @@ intro promises, and it is the first verified success of that approach.
 
 ---
 
-## 1. `!!` and other `!`-containing operators
+## 1. ~~`!!` and other `!`-containing operators~~ — FIXED
 
 `!` is the strictness marker (`!x`), strict-field-access marker (`r!f`),
 and part of list markers (`[!a]`, `[a:b!]`), so it is deliberately excluded
 from the generic `operator` charset (`/[~%^*+\-\\<>\/?|$]+/`). Bare
-`xs !! i` (the stdlib's `(!!) infixl 9` list index) therefore fails to
-lex as an operator.
+`xs !! i` (the stdlib's `(!!) infixl 9` list index) failed to lex as an
+operator.
 
 **Real code:** `args!!0`, `listItems!!r`, `therow!!c`, `fs!!(` — 20 bare
 uses across Clyde/cleantools. The parenthesized form `(!!)` in definitions
 already lexes via `parenthesized_operator`'s charset
-(`/[~%^*+\-\\<>\/?!#$&=@.:|]+/`), and `xs !! i` with surrounding spaces
-does parse (the `!!` becomes two `!` strict markers in the current grammar
-only when adjacent to the identifier, i.e. `args!!0`).
+(`/[~%^*+\-\\<>\/?!#$&=@.:|]+/`).
 
-**Failed approach — dedicated `operator_bang_bang` token (`!!`, prec 1):**
-added to `binary_expression` and/or `_operator_symbol`. Fixed
-Foundation.icl's whole-file wrapper (caused by `args!!0`) but the token's
-presence in expression states tipped recovery in unrelated files:
-PmEnvironment.icl 0 → 160, IdeState.icl 21 → 180, PmFiles.icl 8 → 117,
-PmDirCache.icl 232 → 247/265. Net suite result: worse. Reverted.
+**Failed approach (pre-v1.2.4) — dedicated `operator_bang_bang` token
+(`!!`, prec 1):** added to `binary_expression` and/or `_operator_symbol`.
+Fixed Foundation.icl's whole-file wrapper (caused by `args!!0`) but the
+NEW token's presence in expression states tipped recovery in unrelated
+files: PmEnvironment.icl 0 → 160, IdeState.icl 21 → 180, PmFiles.icl 8 →
+117, PmDirCache.icl 232 → 247/265. Net suite result: worse. Reverted.
 
 **Why it failed:** the new token adds a shift action to every expression
 state, and error recovery (which searches states for one that can shift the
 lookahead token) finds these new states instead of the intended resync
 points, causing the whole-stack pop that wraps the file in one `ERROR`.
+
+**v1.2.4 fix:** reuse the EXISTING `!!` token (it was already a symbol —
+`anon_sym_BANG_BANG` — for the bare list constructor `[!!]`) instead of
+creating a new one. Adding `prec.left(PREC.EXPONENT, seq($._expression,
+field("operator", "!!"), $._expression))` to `binary_expression` (the
+`infixl 9` tier) makes `args!!0` a `binary_expression` with NO new
+symbol, so the lexer DFA is unchanged and error recovery is unaffected in
+unrelated files. `[!!]` still parses as the empty strict-list constructor
+(the `!!` in list-header position wins, and the operator requires an
+operand either side). Corpus: **1352 vs 1374 committed (−22), 0 files
+regressed** — Foundation.icl −20 (its `args!!0` whole-file wrapper is
+gone), PmCleanSystem.icl −2; the previously-regressed files
+(PmEnvironment, IdeState, PmFiles, PmDirCache) are unchanged. Max action
+id 62138. New corpus test covers `args!!0`, `l!!child`, `[!!]`, and the
+`a + b !! c` precedence nesting.
 
 ## 2. Same-column continuation bindings in `#!` / `#` groups
 

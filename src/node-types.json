@@ -626,6 +626,10 @@
         "required": false,
         "types": [
           {
+            "type": "!!",
+            "named": false
+          },
+          {
             "type": "backtick_operator",
             "named": true
           },

@@ -1495,6 +1495,10 @@ module.exports = grammar({
         prec.right(PREC.CONSTRUCTOR, seq($._expression, field("operator", $.operator_cons_strict), $._expression)),
         // backtick-quoted infix operator: `x `bind` y`
         prec.left(PREC.ADD, seq($._expression, field("operator", $.backtick_operator), $._expression)),
+        // `xs !! i` — the stdlib's list index (infixl 9). The `!!` token
+        // already exists for the bare list constructor `[!!]`; reusing it
+        // (rather than a new token) avoids expanding the lexer DFA.
+        prec.left(PREC.EXPONENT, seq($._expression, field("operator", "!!"), $._expression)),
         // generic fallback for any other operator symbol (including
         // `|`-containing operators like `++|`, `<|-` — see operator_pipe)
         prec.left(PREC.ADD, seq($._expression, field("operator", choice($.operator, $.operator_pipe)), $._expression)),
