@@ -477,3 +477,45 @@ binding is dropped (the parser reduces the function at the repeat1
 boundary). Real occurrences: CloogleServer:158 (`Start w`), test_Common.icl.
 The fix needs the same repeat1-continuation state surgery as the
 multi-guard wall (measured: no headroom in the 16-bit table); deferred.
+
+## 8. ~~Spine-strict list literals: `[a:b!]`, `[b!]`~~ — FIXED
+
+Expression-position spine-strict list literals (`_cons a b = [a:b!]`, the
+stdlib's `_SystemStrictLists.icl`) errored at the `!`: the element's
+`!`-shift into strict field access (prec ACCESS) beat the list-close reduce
+(implicit 0), so the spine path was never taken. Types (`[#.e!]`) and
+patterns (`_decons [a:b!] = (a,b)`) already worked; only expressions failed.
+
+**Mechanism of the fix.** The conflict is a reduce-reduce at the atom —
+element (`_expression`) vs. field-access record — that LALR resolves toward
+the record. Extracting the anonymous inline record
+`choice(atom, field_access, application)` into a named hidden `_record`
+rule (shared by `field_access` and `index_access`; a separate rule for
+either would make the reduce-reduce three-way and the fork never fire) lets
+the fork be declared: `[$._expression, $._record]` in `conflicts`. The fork
+fires only at `!` lookahead (a bare `_expression` is never followed by `.`),
+so `r.f` and `[b!x]` never fork — `[b!x]` still parses as strict field
+access, `[a:b!]` / `[b!]` as spine-strict. The list structure stays HEAD's
+`repeat` (the recursive `_list_tail` variant that also enabled the fork
+regressed error recovery in error-heavy files: projwindowcontroller 3→98,
+PmPath 19→54 — measured, reverted).
+
+**Headroom lever — removed a dead rule.** The fork pushed the action table
+2 ids over the 65536 ceiling (65537). `range_expression` (`[1..10]`,
+`[1,3..n]`) never fired — those parse as `list_expression` holding a
+`binary_expression` with `range_operator`, byte-identical trees with or
+without the rule (verified at HEAD) — and its 4232 actions were the
+headroom needed: removing it from `_expression` / `_expression_atom` and
+deleting the rule drops the max action id to **61305**, 4230 under the
+ceiling, with **0 overflow warnings**.
+
+**Verified (post-716051f, 197-file corpus, cache-busted vs HEAD):** max
+action id 61305 (0 overflows); corpus 76/76 tests (80/80 after adding 4
+spine-strict regression tests); total errors **1401 → 1378** with **0
+files regressed** — `_SystemStrictLists.icl` 6→0 (both copies),
+`UtilStrictLists.dcl` 3→0, `Link.icl` 16→12, `PmProject.icl` 60→58,
+`UtilStrictLists.icl` 8→6. The previous 65537-attempt (same fork, no
+range-rule removal) silently truncated one table entry
+(`ACTIONS(65537)` → `RECOVER` on a `with`-block inline-layout state); the
+corpus measured identical (1378), but it is a latent corruption — do not
+ship without the headroom.

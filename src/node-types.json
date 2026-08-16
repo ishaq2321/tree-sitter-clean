@@ -162,10 +162,6 @@
         "named": true
       },
       {
-        "type": "range_expression",
-        "named": true
-      },
-      {
         "type": "record_expression",
         "named": true
       },
@@ -420,10 +416,6 @@
             "named": true
           },
           {
-            "type": "range_expression",
-            "named": true
-          },
-          {
             "type": "record_expression",
             "named": true
           },
@@ -527,10 +519,6 @@
           },
           {
             "type": "qualified_identifier",
-            "named": true
-          },
-          {
-            "type": "range_expression",
             "named": true
           },
           {
@@ -1621,10 +1609,6 @@
             "named": true
           },
           {
-            "type": "range_expression",
-            "named": true
-          },
-          {
             "type": "record_expression",
             "named": true
           },
@@ -2438,10 +2422,6 @@
           },
           {
             "type": "qualified_identifier",
-            "named": true
-          },
-          {
-            "type": "range_expression",
             "named": true
           },
           {
@@ -3381,21 +3361,6 @@
     }
   },
   {
-    "type": "range_expression",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "_expression",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
     "type": "record_definition",
     "named": true,
     "fields": {},
@@ -4228,10 +4193,6 @@
         },
         {
           "type": "question_marker",
-          "named": true
-        },
-        {
-          "type": "range_expression",
           "named": true
         },
         {

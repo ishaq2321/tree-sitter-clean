@@ -5816,10 +5816,6 @@
         },
         {
           "type": "SYMBOL",
-          "name": "range_expression"
-        },
-        {
-          "type": "SYMBOL",
           "name": "code_expression"
         },
         {
@@ -6260,6 +6256,23 @@
         ]
       }
     },
+    "_record": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "_expression_atom"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "field_access"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "application"
+        }
+      ]
+    },
     "field_access": {
       "type": "PREC_LEFT",
       "value": 11,
@@ -6270,21 +6283,8 @@
             "type": "FIELD",
             "name": "record",
             "content": {
-              "type": "CHOICE",
-              "members": [
-                {
-                  "type": "SYMBOL",
-                  "name": "_expression_atom"
-                },
-                {
-                  "type": "SYMBOL",
-                  "name": "field_access"
-                },
-                {
-                  "type": "SYMBOL",
-                  "name": "application"
-                }
-              ]
+              "type": "SYMBOL",
+              "name": "_record"
             }
           },
           {
@@ -6321,21 +6321,8 @@
             "type": "FIELD",
             "name": "record",
             "content": {
-              "type": "CHOICE",
-              "members": [
-                {
-                  "type": "SYMBOL",
-                  "name": "_expression_atom"
-                },
-                {
-                  "type": "SYMBOL",
-                  "name": "field_access"
-                },
-                {
-                  "type": "SYMBOL",
-                  "name": "application"
-                }
-              ]
+              "type": "SYMBOL",
+              "name": "_record"
             }
           },
           {
@@ -7324,47 +7311,6 @@
         }
       ]
     },
-    "range_expression": {
-      "type": "SEQ",
-      "members": [
-        {
-          "type": "STRING",
-          "value": "["
-        },
-        {
-          "type": "SYMBOL",
-          "name": "_expression"
-        },
-        {
-          "type": "STRING",
-          "value": ","
-        },
-        {
-          "type": "SYMBOL",
-          "name": "_expression"
-        },
-        {
-          "type": "STRING",
-          "value": ".."
-        },
-        {
-          "type": "CHOICE",
-          "members": [
-            {
-              "type": "SYMBOL",
-              "name": "_expression"
-            },
-            {
-              "type": "BLANK"
-            }
-          ]
-        },
-        {
-          "type": "STRING",
-          "value": "]"
-        }
-      ]
-    },
     "tuple_expression": {
       "type": "SEQ",
       "members": [
@@ -8038,10 +7984,6 @@
         {
           "type": "SYMBOL",
           "name": "list_expression"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "range_expression"
         },
         {
           "type": "SYMBOL",
@@ -8934,7 +8876,7 @@
     ],
     [
       "_expression",
-      "field_access"
+      "_record"
     ],
     [
       "binary_expression",

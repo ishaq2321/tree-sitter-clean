@@ -186,9 +186,13 @@ module.exports = grammar({
     [$.list_pattern, $.list_expression],
     // a list element followed by `!`: the `!` starts a strict field access on
     // the element (`[b!x]`) or closes the list as the spine-strict marker
-    // (`[b!]` / `[b:c!]`). field_access's prec(ACCESS) beats the element
-    // reduce's implicit 0, so the spine path is never taken without a fork.
-    [$._expression, $.field_access],
+    // (`[b!]` / `[b:c!]`). The conflict is a reduce-reduce at the atom
+    // (element vs field-access record) that LALR resolves toward the record,
+    // so the spine path is never taken without a fork — `_record` is named
+    // (see field_access) so this fork can be declared. The conflict exists
+    // only where the lookahead is `!` (a bare `_expression` is never followed
+    // by `.`), so `r.f` never forks.
+    [$._expression, $._record],
     // case_alternative with guard: body expression consuming `->` vs arrow separator
     [$.binary_expression, $.case_alternative],
     // guard block members: continue with another member vs. end the block
@@ -1456,7 +1460,6 @@ module.exports = grammar({
         $.array_expression,
         $.record_expression,
         $.record_update,
-        $.range_expression,
         $.code_expression,
         $._expression_atom,
       ),
@@ -1515,12 +1518,23 @@ module.exports = grammar({
         ),
       ),
 
+    // The base of a field/index access: an atom (possibly itself an access
+    // chain `a.b.c`) or an application (`f x.y`). Named (hidden) rather than
+    // an inline choice so the spine-strict-list fork below can reference it
+    // in `conflicts`; hidden rules never appear in the tree, so the shape of
+    // `record.field` / `array.[i]` is unchanged. BOTH access rules must use
+    // this one rule: with the field-access `!` and the index-access `!`
+    // (`a!.[i]`) sharing a record, the `!`-conflict is exactly `_expression`
+    // vs `_record`; a separate anonymous record for index_access would make
+    // the reduce-reduce three-way and the declared fork would never fire.
+    _record: ($) => choice($._expression_atom, $.field_access, $.application),
+
     // `record.field` or `record!field` (strict field access)
     field_access: ($) =>
       prec.left(
         PREC.ACCESS,
         seq(
-          field("record", choice($._expression_atom, $.field_access, $.application)),
+          field("record", $._record),
           choice(".", "!"),
           field("field", $.identifier),
         ),
@@ -1531,7 +1545,7 @@ module.exports = grammar({
       prec.left(
         PREC.ACCESS,
         seq(
-          field("record", choice($._expression_atom, $.field_access, $.application)),
+          field("record", $._record),
           optional("!"),
           ".",
           "[",
@@ -1725,18 +1739,6 @@ module.exports = grammar({
         "]",
       ),
 
-    // `[1..10]`, `[1, 3..n]` — dotdot range inside list brackets
-    range_expression: ($) =>
-      seq(
-        "[",
-        $._expression,
-        ",",
-        $._expression,
-        "..",
-        optional($._expression),
-        "]",
-      ),
-
     // `(a, b, c)`
     tuple_expression: ($) =>
       seq("(", $._expression, ",", $._expression, repeat(seq(",", $._expression)), ")"),
@@ -1889,7 +1891,6 @@ module.exports = grammar({
         $.paren_expression,
         $.tuple_expression,
         $.list_expression,
-        $.range_expression,
         $.list_comprehension,
         $.array_comprehension,
         $.array_expression,

@@ -41,3 +41,76 @@ bx = bimap{|(*)->*->*|}
         kind: (operator_mul)
         kind: (arrow)
         kind: (operator_mul)))))
+
+==================
+Spine-Strict List Expression
+==================
+x = [a:b!]
+y = [b!]
+z = [a:b:c!]
+---
+(source_file
+  (function_declaration
+    name: (identifier)
+    body: (list_expression
+      (identifier)
+      (identifier)))
+  (function_declaration
+    name: (identifier)
+    body: (list_expression
+      (identifier)))
+  (function_declaration
+    name: (identifier)
+    body: (list_expression
+      (identifier)
+      (identifier)
+      (identifier))))
+
+==================
+Strict Field Access in List Element
+==================
+x = [b!x]
+y = [a:b!x]
+---
+(source_file
+  (function_declaration
+    name: (identifier)
+    body: (list_expression
+      (field_access
+        record: (identifier)
+        field: (identifier))))
+  (function_declaration
+    name: (identifier)
+    body: (list_expression
+      (identifier)
+      (field_access
+        record: (identifier)
+        field: (identifier)))))
+
+==================
+Strict Field Access
+==================
+w = r!f
+---
+(source_file
+  (function_declaration
+    name: (identifier)
+    body: (field_access
+      record: (identifier)
+      field: (identifier))))
+
+==================
+List Range Expression
+==================
+v = [1..10]
+---
+(source_file
+  (function_declaration
+    name: (identifier)
+    body: (list_expression
+      (binary_expression
+        (number
+          (integer))
+        (range_operator)
+        (number
+          (integer))))))
