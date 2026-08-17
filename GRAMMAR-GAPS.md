@@ -293,18 +293,42 @@ and rejected:
   gap-#2 warning that the shared guard-list states cannot take the
   continuation rule without polluting every expression in the corpus.
 
-Separate sub-gap found while tracing: `subdirs & [subdir_i] = e` is
-documented Clean 2.3 syntax (`# a & [i]=x` desugars to
-`# a = {a & [i]=x}` — see cloogle.org/backend/Builtin/Syntax.icl:727),
-but `record_update_pattern` only accepts *identifier* fields after `&`,
-not `[index]` (the record-*expression* side's `update_field` does
-accept them). Any future gap-#4 attempt should widen
-`record_update_pattern` first.
+### PARTIALLY CLOSED (post-0345746) — record-update indexes + block-local continuation members
 
-A workable gap-#4 fix likely needs the `[$._binding_tail]`-style GLR
-fork (the mechanism that makes the same-column tail unambiguous) applied
-at the layoutBlockMembers separator, which the current shared-rule
-structure does not expose — a structural redesign, not an additive fix.
+A follow-up pass combined three *additive* grammar changes (no scanner
+change, no layoutBlockMembers redesign) and measured a net **−13** on
+the 239-file corpus (791 vs 804), 83/83 tests, action-table ceiling
+64042 (< 65535):
+
+- **`record_update_pattern` widened to accept `[index]` fields**
+  (mirroring the expression side's `update_field`, including ranges
+  `[a..b]`). This closes the `subdirs & [subdir_i] = e` sub-gap
+  documented above — real Clean 2.3 syntax (`# a & [i]=x` desugars to
+  `# a = {a & [i]=x}`). PmDirCache's 8 array-update bindings parse.
+- **`continuation_binding` added as a member of the `guard_equation`
+  body block** (the layoutBlockMembers choice inside `guard_equation`)
+  AND **the two case-alternative member choices** (the binding-first
+  `repeat1` and the guard-first `repeat`). Unlike the four
+  *guard-list* sites measured above (+82), these three sites do NOT
+  share their automaton states with the rest of the corpus, so the
+  pollution is small: per-file, PmDirCache 22→14, PmAbcMagic 49→43,
+  and the only regression is PmDriver 31→32 (+1).
+
+What remains open is the *scanner* half of gap #4. Re-adding the
+scanner-side SEMICOLON branch (binding-shaped deeper lines, zero-width
+SEMICOLON) on top of these grammar fixes still measures **+7** on the
+corpus (811 vs 804): it fixes coloured_line 35→0, PmDirCache 15,
+projdocument 29, PmCleanSystem 5, and PmPath 14, but breaks the
+where-block membership via GLR fork priority (PmFileInfo 4→49: the
+SEMICOLON splits a guard-body continuation correctly, but the extra
+forks push the 11-version GLR race past the where-block-continue fork,
+escaping the whole declaration) and trips the error-recovery phantom
+stack in case bodies (PmDriver 31→50 with a whole-file ERROR). A
+workable scanner-side fix needs to emit the separator without creating
+the extra LALR fork — likely the `[$._binding_tail]`-style GLR fork
+applied at the layoutBlockMembers separator, which the current
+shared-rule structure does not expose — a structural redesign, not an
+additive fix.
 
 ## 5. ~~Record update by type name: `{ T | field = value, ... }`~~ — FIXED in v1.2.3
 

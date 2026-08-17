@@ -762,6 +762,10 @@
           "named": true
         },
         {
+          "type": "continuation_binding",
+          "named": true
+        },
+        {
           "type": "guard_binding",
           "named": true
         },
@@ -2192,6 +2196,10 @@
       "required": false,
       "types": [
         {
+          "type": "continuation_binding",
+          "named": true
+        },
+        {
           "type": "guard_binding",
           "named": true
         },
@@ -3587,7 +3595,7 @@
       "required": true,
       "types": [
         {
-          "type": "identifier",
+          "type": "_expression",
           "named": true
         }
       ]

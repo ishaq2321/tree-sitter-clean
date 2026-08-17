@@ -1280,6 +1280,7 @@ module.exports = grammar({
               choice(
                 $.guard_equation,
                 seq($.guard_binding, optional($.with_block)),
+                seq($.continuation_binding, optional($.with_block)),
                 seq($.guard_body, optional($.with_block)),
               ),
             ),
@@ -1440,12 +1441,21 @@ module.exports = grammar({
       ),
 
     // `ds & modpaths` — a record-update pattern used in let-before bindings
-    // (`# ds & modpaths = [!next : ds.modpaths]`).
+    // (`# ds & modpaths = [!next : ds.modpaths]`). Fields may also be array
+    // indexes (`subdirs & [subdir_i] = e` — Clean 2.3 `# a & [i]=x` syntax,
+    // desugaring to `# a = {a & [i]=x}`), mirroring update_field on the
+    // expression side.
     record_update_pattern: ($) =>
       prec(1, seq(
         $.identifier,
         "&",
-        repeat1(seq(optional(","), $.identifier)),
+        repeat1(seq(
+          optional(","),
+          choice(
+            $.identifier,
+            seq("[", $._expression, optional(seq("..", optional($._expression))), "]"),
+          ),
+        )),
       )),
 
     wildcard: ($) => "_",
@@ -1797,6 +1807,7 @@ module.exports = grammar({
                 optional(choice($._layout_semicolon, seq(";", optional($._layout_semicolon)))),
                 choice(
                   seq($.guard_binding, optional($.with_block)),
+                  seq($.continuation_binding, optional($.with_block)),
                   $.guard_body,
                   $.guard_equation,
                 ),
@@ -1817,6 +1828,7 @@ module.exports = grammar({
                 optional(choice($._layout_semicolon, seq(";", optional($._layout_semicolon)))),
                 choice(
                   seq($.guard_binding, optional($.with_block)),
+                  seq($.continuation_binding, optional($.with_block)),
                   $.guard_body,
                   $.guard_equation,
                 ),
