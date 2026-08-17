@@ -261,12 +261,50 @@ action id 61283. New corpus test covers `a![i]`, `a!.[i]`, `a.[i]`,
   subdirs & [subdir_i] = {subdir & subdir_cache=cache}
 ```
 
-(PmDirCache.icl's `DC_HUpdate`.) The deeper column is indistinguishable
-from a multi-line application continuation at the lexer level (312 real
-value-continuation lines in the corpus would break if a separator were
-emitted at every deeper line). Requires the same member/separator
-mechanism as #2 plus a binding-lookahead heuristic — both blocked by the
-same walls.
+(PmDirCache.icl's `DC_HUpdate` / `DC_HSearch`, and projdocument.icl's
+`initProjDocument` guard-list bindings.) The deeper column is
+indistinguishable from a multi-line application continuation at the
+lexer level, so the fix needs the same member/separator mechanism as #2
+plus a way to tell a binding from an application continuation. Every
+mechanism tried in this pass was measured against the 197-file corpus
+and rejected:
+
+- **Scanner-side SEMICOLON at binding-shaped deeper lines** (a
+  `pattern = ...` lookahead peek, excluding `#`/`|`/`=`/keyword starters
+  and lines at root level). The emitted SEMICOLON is *ambiguous* in the
+  LALR automaton: after `member SEMICOLON` the parser cannot distinguish
+  "another member" from "the final-member closer", and it resolves to
+  the closer — so the continuation escapes to top level as a fresh
+  function/declaration. Measured: projdocument.icl 32→**276**, full
+  corpus **1415** vs 803 (even with the `#`-exclusion and a pushed-level
+  gate). The same-column case works only because the enclosing structure
+  then errors, killing the escape fork; deeper lines parse as valid new
+  declarations, so nothing disambiguates.
+- **`continuation_binding` as a guard-body-block member** (the
+  `layoutBlockMembers` choice inside `guard_equation`). Fixes
+  same-column guard-body continuations (probe 3→0 errors) and
+  PmAbcMagic −6, but perturbs the SHARED layoutBlockMembers automaton
+  states: `_SystemArray.dcl` +17 (its `instance Array {32#} Int where`
+  size annotations misparse), net 814 (+11). layoutBlockMembers is
+  reused by class/instance/special/where blocks, so any member-choice
+  change leaks into all of them.
+- **`continuation_binding` in the four guard-list member choices**
+  (function/operator/case/generic definitions). 885 (+82): confirms the
+  gap-#2 warning that the shared guard-list states cannot take the
+  continuation rule without polluting every expression in the corpus.
+
+Separate sub-gap found while tracing: `subdirs & [subdir_i] = e` is
+documented Clean 2.3 syntax (`# a & [i]=x` desugars to
+`# a = {a & [i]=x}` — see cloogle.org/backend/Builtin/Syntax.icl:727),
+but `record_update_pattern` only accepts *identifier* fields after `&`,
+not `[index]` (the record-*expression* side's `update_field` does
+accept them). Any future gap-#4 attempt should widen
+`record_update_pattern` first.
+
+A workable gap-#4 fix likely needs the `[$._binding_tail]`-style GLR
+fork (the mechanism that makes the same-column tail unambiguous) applied
+at the layoutBlockMembers separator, which the current shared-rule
+structure does not expose — a structural redesign, not an additive fix.
 
 ## 5. ~~Record update by type name: `{ T | field = value, ... }`~~ — FIXED in v1.2.3
 
