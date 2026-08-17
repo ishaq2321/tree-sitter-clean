@@ -1,7 +1,7 @@
 [package]
 name = "tree-sitter-clean"
 description = "Clean grammar for tree-sitter"
-version = "1.2.3"
+version = "1.2.4"
 license = "MIT"
 readme = "README.md"
 authors = ["Muhammad Ishaq Khan <ishaq2321@users.noreply.github.com>"]
