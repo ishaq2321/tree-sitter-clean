@@ -128,6 +128,11 @@ module.exports = grammar({
     // a let-before block's `= expr` member vs. ending the function body there
     [$.function_declaration, $.guard_body],
     [$.operator_definition, $.guard_body],
+    // `#`-group continuation members: at the separator after a member, the
+    // recursion's ε-alternative (end the group) conflicts with the shift
+    // (continue with the next member). GLR keeps both; the error-free
+    // continuation wins.
+    [$._binding_tail],
     // a trailing `;` after a let-before/guard member: continue the member list
     // (the `;` is the next member's separator) vs. end the declaration (the
     // `;` is a stray statement terminator). GLR keeps both; the error-free
@@ -1134,8 +1139,34 @@ module.exports = grammar({
             // there instead of consuming the `;`. Guards are allowed after
             // the bindings too (`# a = 1;` `| a > 0` `= 2`).
             seq(
-              seq($.guard_binding, optional($.with_block)),
-              repeat1(
+              seq(alias($._guard_binding_group, $.guard_binding), optional($.with_block)),
+              // Continuation members via a named right-recursive tail (NOT a
+              // repeat): at the separator after a member, a repeat's table
+              // entry is REDUCE + SHIFT_REPEAT and the runtime always skips
+              // SHIFT_REPEAT, so a second continuation binding ends the
+              // group after ONE member. The recursion makes the same
+              // position a genuine REDUCE-vs-SHIFT conflict, which stays a
+              // live GLR fork via the `[$._binding_tail]` self-pair below —
+              // the error-free continuation wins.
+              prec.right(
+                1,
+                seq(
+                  $._binding_tail,
+                  // The group sits DEEPER than the function's own guards:
+                  // when the next line dedents to the function's column
+                  // (`| guard` or `= body`), the scanner closes the group's
+                  // level with a LAYOUT_END. The prec.right(1) makes the
+                  // END shift beat the function-end reduce (prec 0, left)
+                  // so the group closes and the guards below continue.
+                  optional($._layout_end),
+                ),
+              ),
+              // Guards and bodies continue at the function's own column,
+              // exactly like the first-member-guard branch's repeat below.
+              // Each iteration also absorbs a trailing `;` (a stray
+              // statement terminator after the LAST member) so `;` never
+              // enters the repeat's FOLLOW.
+              repeat(
                 seq(
                   optional(choice($._layout_semicolon, seq(";", optional($._layout_semicolon)))),
                   choice(
@@ -1143,9 +1174,9 @@ module.exports = grammar({
                     seq($.guard_body, optional($.with_block)),
                     $.guard_equation,
                   ),
+                  optional(seq(";", optional($._layout_semicolon))),
                 ),
               ),
-              optional(choice($._layout_semicolon, seq(";", optional($._layout_semicolon)))),
               optional($.where_block),
             ),
           ),
@@ -1184,8 +1215,34 @@ module.exports = grammar({
             ),
             // let-before bindings without guards (see function_declaration)
             seq(
-              seq($.guard_binding, optional($.with_block)),
-              repeat1(
+              seq(alias($._guard_binding_group, $.guard_binding), optional($.with_block)),
+              // Continuation members via a named right-recursive tail (NOT a
+              // repeat): at the separator after a member, a repeat's table
+              // entry is REDUCE + SHIFT_REPEAT and the runtime always skips
+              // SHIFT_REPEAT, so a second continuation binding ends the
+              // group after ONE member. The recursion makes the same
+              // position a genuine REDUCE-vs-SHIFT conflict, which stays a
+              // live GLR fork via the `[$._binding_tail]` self-pair below —
+              // the error-free continuation wins.
+              prec.right(
+                1,
+                seq(
+                  $._binding_tail,
+                  // The group sits DEEPER than the function's own guards:
+                  // when the next line dedents to the function's column
+                  // (`| guard` or `= body`), the scanner closes the group's
+                  // level with a LAYOUT_END. The prec.right(1) makes the
+                  // END shift beat the function-end reduce (prec 0, left)
+                  // so the group closes and the guards below continue.
+                  optional($._layout_end),
+                ),
+              ),
+              // Guards and bodies continue at the function's own column,
+              // exactly like the first-member-guard branch's repeat below.
+              // Each iteration also absorbs a trailing `;` (a stray
+              // statement terminator after the LAST member) so `;` never
+              // enters the repeat's FOLLOW.
+              repeat(
                 seq(
                   optional(choice($._layout_semicolon, seq(";", optional($._layout_semicolon)))),
                   choice(
@@ -1193,9 +1250,9 @@ module.exports = grammar({
                     seq($.guard_body, optional($.with_block)),
                     $.guard_equation,
                   ),
+                  optional(seq(";", optional($._layout_semicolon))),
                 ),
               ),
-              optional(choice($._layout_semicolon, seq(";", optional($._layout_semicolon)))),
               optional($.where_block),
             ),
           ),
@@ -1239,8 +1296,81 @@ module.exports = grammar({
     // would be swallowed as a binary operator.
     guard_body: ($) => seq(choice("=", $.arrow), field("body", $._expression)),
 
+    // The member choice shared by the `#`-group binding branch and its
+    // recursive tail.
+    _binding_member: ($) =>
+      choice(
+        seq($.guard_binding, optional($.with_block)),
+        seq($.continuation_binding, optional($.with_block)),
+        seq($.guard_body, optional($.with_block)),
+        $.guard_equation,
+      ),
+
+    // `sep member [sep member ...]` — the continuation members of a `#`-group
+    // binding branch, right-recursive (see the comment at the call site for
+    // why a repeat cannot express this). NON-nullable: the group must have
+    // at least one member after the first binding (a lone binding is not a
+    // complete definition), mirroring the old repeat1. At the separator
+    // after a member, the `sep member`-done REDUCE (end the group) conflicts
+    // with the SHIFT (continue with the next member) — the declared
+    // `[$._binding_tail]` self-pair keeps it a live GLR fork.
+    _binding_tail: ($) =>
+      choice(
+        seq(
+          optional(choice($._layout_semicolon, seq(";", optional($._layout_semicolon)))),
+          $._binding_member,
+          $._binding_tail,
+        ),
+        seq(
+          optional(choice($._layout_semicolon, seq(";", optional($._layout_semicolon)))),
+          $._binding_member,
+          // The LAST member of the group absorbs a trailing `;` (a stray
+          // statement terminator), mirroring the committed branch's
+          // trailing optional separator.
+          optional(seq(";", optional($._layout_semicolon))),
+        ),
+      ),
+
     guard_binding: ($) =>
       seq(choice("#", "#!"), field("pattern", $._pattern), "=", field("value", $._expression)),
+
+    // The FIRST binding of a `#`-group (`#! (a,b) = f env` followed by
+    // continuation bindings at the same column, `(c,d) = g a`). Kept
+    // SEPARATE from the plain guard_binding (used in where-blocks, guard
+    // lists, case blocks): only the binding branches of
+    // function_declaration/case_alternative reference it, so the
+    // continuation machinery below (`_binding_tail` with `_layout_semicolon`
+    // separators) is never reachable from the shared guard-list states.
+    // (An `_inline_layout_start` variant was tried and reverted: the
+    // zero-width token changed the layout stream for every `#` binding in
+    // the corpus and wrecked recovery — measured 1074 vs 803.)
+    _guard_binding_group: ($) =>
+      seq(
+        choice("#", "#!"),
+        field("pattern", $._pattern),
+        "=",
+        field("value", $._expression),
+      ),
+
+    // `pattern = expr` — a `#`-group continuation binding that DROPS the `#`
+    // (`#! (a,b) = f env` then `(c,d) = g a` on the next line, same column).
+    continuation_binding: ($) =>
+      seq(
+        field(
+          "pattern",
+          choice(
+            $.identifier,
+            $.tuple_pattern,
+            $.list_pattern,
+            $.paren_pattern,
+            $.constructor_pattern,
+            $.strict_pattern,
+            $.record_update_pattern,
+          ),
+        ),
+        "=",
+        field("value", $._expression),
+      ),
 
     // shared shape for `where`/`with` local-binding blocks
     _where_or_with: ($) =>

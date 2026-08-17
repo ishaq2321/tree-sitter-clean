@@ -1261,6 +1261,56 @@
     }
   },
   {
+    "type": "continuation_binding",
+    "named": true,
+    "fields": {
+      "pattern": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "constructor_pattern",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "list_pattern",
+            "named": true
+          },
+          {
+            "type": "paren_pattern",
+            "named": true
+          },
+          {
+            "type": "record_update_pattern",
+            "named": true
+          },
+          {
+            "type": "strict_pattern",
+            "named": true
+          },
+          {
+            "type": "tuple_pattern",
+            "named": true
+          }
+        ]
+      },
+      "value": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "_expression",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "data_constructor",
     "named": true,
     "fields": {
@@ -1814,6 +1864,10 @@
       "multiple": true,
       "required": false,
       "types": [
+        {
+          "type": "continuation_binding",
+          "named": true
+        },
         {
           "type": "guard_binding",
           "named": true
@@ -3195,6 +3249,10 @@
       "multiple": true,
       "required": false,
       "types": [
+        {
+          "type": "continuation_binding",
+          "named": true
+        },
         {
           "type": "guard_binding",
           "named": true

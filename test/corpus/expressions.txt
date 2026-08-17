@@ -185,3 +185,67 @@ w = a + b !! c
       (binary_expression
         (identifier)
         (identifier)))))
+
+==================
+Continuation Binding Group
+==================
+f x
+	#! m = if (x > 0) "+" "-"
+	enc = g m
+	| enc > 0
+		= "pos"
+	= "neg"
+
+g x
+	# a = h x
+	(b,c) = k a
+	= c
+---
+(source_file
+  (function_declaration
+    name: (identifier)
+    pattern: (identifier)
+    (guard_binding
+      pattern: (identifier)
+      value: (if_expression
+        condition: (paren_expression
+          (binary_expression
+            (identifier)
+            operator: (operator_compare)
+            (number
+              (integer))))
+        consequence: (string)
+        alternative: (string)))
+    (continuation_binding
+      pattern: (identifier)
+      value: (application
+        function: (identifier)
+        argument: (identifier)))
+    (guard_equation
+      condition: (binary_expression
+        (identifier)
+        operator: (operator_compare)
+        (number
+          (integer)))
+      (guard_body
+        body: (string)))
+    (guard_body
+      body: (string)))
+  (function_declaration
+    name: (identifier)
+    pattern: (identifier)
+    (guard_binding
+      pattern: (identifier)
+      value: (application
+        function: (application
+          function: (identifier)
+          argument: (identifier))
+        argument: (tuple_expression
+          (identifier)
+          (identifier))))
+    (guard_body
+      body: (application
+        function: (identifier)
+        argument: (identifier)))
+    (guard_body
+      body: (identifier))))

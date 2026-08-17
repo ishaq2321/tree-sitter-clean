@@ -14,15 +14,14 @@ a whole-file `ERROR` wrapper where the file previously parsed with local
 errors. Every rejected approach below was rejected for exactly this reason,
 measured on the full suite, not on isolated probes.
 
-The current verified baseline (master, post-716051f): corpus **76/76**;
-Eastwood (63 `.icl` + `.dcl` files) **711 ERROR nodes** (headline
-`EastwoodCleanLanguageServer.icl`: **109**); clean-stdlib root `Std*`
-files (25) **0/0**; Clyde+cloogle **1328**; total across all 151 corpus
-files **2039** (was 2948 at v1.2.0, net **-909**); **0 action-table
-overflows**. (The v1.2.1 figures below — 60/60, 1897 Eastwood, 1786
-Clyde+cloogle — were measured on a smaller file selection and are
-superseded by the above, which is apples-to-apples against the previous
-grammar on identical file lists.)
+The current verified baseline (post-954fe8f + the gap-#2 fix): **197-file
+corpus total 803 ERROR nodes** (was 1352 after the `!!` fix, 1401 at
+pre-session HEAD), **errFiles 35**, **0 action-table overflows** (max
+action id 64620, 2915 under the 65535 ceiling), corpus tests **82/82**.
+(The older figures below — 76/76, 2039 across 151 files, etc. — were
+measured on smaller file selections and are superseded by the above,
+which is apples-to-apples against the previous grammar on identical file
+lists.)
 
 ## Root cause: the 65536-entry action-table limit
 
@@ -124,7 +123,7 @@ gone), PmCleanSystem.icl −2; the previously-regressed files
 id 62138. New corpus test covers `args!!0`, `l!!child`, `[!!]`, and the
 `a + b !! c` precedence nesting.
 
-## 2. Same-column continuation bindings in `#!` / `#` groups
+## 2. ~~Same-column continuation bindings in `#!` / `#` groups~~ — FIXED (post-954fe8f)
 
 A `#!` (or `#`) let-before group whose subsequent bindings drop the `#`:
 
@@ -175,51 +174,51 @@ emit `LAYOUT_SEMICOLON` when the parser does not request it
 (`valid_symbols`); forcing it would be rejected. Requesting it requires the
 reduce action that only the (exploding) conflict provides.
 
-### v1.2.4+ investigation (reverted)
+### FIXED — the GLR `_binding_tail` structure (post-954fe8f)
 
-Approaches A–C predate the scanner's deferred-layout mechanism (the
-`pending_block` step-2b path built for `special` blocks). Re-testing on the
-v1.2.4 grammar, the scanner CAN establish the group's level at the
-continuation column: add `$._inline_layout_start` to `guard_binding` — the
-scanner defers the level to the next line's column and emits a sibling
-`LAYOUT_SEMICOLON` there (exactly the `special a=Int` mechanism). With a
-`continuation_binding` member added to the binding branch, a **single**
-continuation followed by `= body` at EOF parses cleanly (`lookStr` shape:
-`#! (str,env) = objectGet...` then `= str`).
+The winning structure sidesteps all three blockers by giving the group a
+**live GLR fork** instead of fighting the repeat machinery:
 
-Three blockers remain, each verified against the runtime/generator source:
+- The binding branch (in both `function_declaration` and
+  `case_alternative`) becomes `guard_binding` + `optional(with_block)` +
+  `[$._binding_tail]` where `_binding_tail` is a **named recursive rule**
+  (`_binding_member` followed by either `_binding_tail` or an
+  end-alternative), self-paired in `conflicts` as `[$._binding_tail]`.
+  The self-conflict keeps the recursion a live GLR fork, so at each member
+  boundary the parser explores BOTH paths (continue the group / end it) in
+  parallel until the input decides — this is what makes the **second and
+  later** continuations work (blocker 1). `prec.right` on the tail+END
+  sequence makes the END-shift beat the function-reduce so a guard/body
+  after the group binds to the group's function (blocker 2).
+- `continuation_binding` (`pattern = expr`, no `#`) is a member of the
+  group. Its pattern set is **restricted to the 7 shapes found in the
+  corpus** — identifier, tuple, list, paren, constructor, strict, and
+  `record_update_pattern` (`subdirs & [i] = ...`) — because a broader
+  pattern set pollutes the post-`#` lexer state and regresses
+  `_SystemArray.dcl`'s `{32#}` recovery (+17).
+- The group's FIRST member uses a dedicated `_guard_binding_group` rule
+  (aliased to `guard_binding` in the tree) so the group exists only in the
+  binding branches, never in the shared guard-list state.
+- The trailing `optional($._layout_end)` inside the `prec.right` tail
+  consumes the group's dedent END — without it the corpus is 1141 (+338
+  across 17 files). The `_inline_layout_start`-on-the-group variants were
+  all worse (1074 / 1045): the zero-width scanner token changes the
+  lexer stream everywhere and degrades recovery in deep-nested case files.
 
-1. **The second continuation ends the repeat.** The binding branch's
-   `repeat1(seq(optional(sep), member))` has SEMICOLON in the repeat's
-   FOLLOW (the trailing `optional(sep)` after the repeat1), so after a
-   member the table pairs `REDUCE(aux_repeat)` with a `SHIFT_REPEAT` — and
-   the runtime always skips SHIFT_REPEAT
-   (`if (action.shift.repetition) break;` in `ts_parser__advance`), so the
-   reduce wins and the repeat ends after ONE continuation. `prec.right(N)`
-   on the repeat1 does not help: the repeat-continuation shift's
-   precedence comes from the recursive item's prev-step, not the wrapper.
-   The `member sep` order (mirroring `layoutBlockMembers`, where the
-   separator is consumed inside the iteration and continuation happens on
-   member starts) loses the FORCED first separator: the value-expression
-   application state then doesn't request SEMICOLON, and the first
-   continuation is absorbed as an argument. A layoutBlockMembers-style
-   final-member closer (`seq(member, choice(END, ";", SEMI))`) outside the
-   repeat keeps SEMICOLON out of the repeat's FOLLOW, but the final
-   member's first-token overlap with the repeat's members destabilized the
-   automaton (whole-file ERROR on the cbHandler probe).
+**Verified:** corpus **1352 → 803 (−549)**, **errFiles 36 → 35**, **only
+regression tabview.icl 0 → 1** (see below); max action id **64620**;
+82/82 corpus tests (new "Continuation Binding Group" test). Big wins:
+PmDirCache 132 → 22 (its whole-file `DC_HUpdate` wrapper is gone),
+PmParse 289 → 198, CloogleServer 155 → 65, Foundation 20 → 0, objc 10 → 0.
 
-2. **The group's dedent LAYOUT_END has no consumer.** The scanner pushes
-   the group level at the continuation column; when the next line dedents
-   to the function's own column (`| result_ <> result_ = undef` after the
-   `result_ = writeInt ...` binding), it emits LAYOUT_END (step 4), and
-   `function_declaration` has no rule position that shifts it — the
-   function-end reduce (prec 0, left) beats any END shift (prec 0) at
-   build time, so the `|` guard errors.
-
-3. **`#` (vs `#!`) never requests the inline start.** The state after `#`
-   merges with `let_before_expression`'s `#` (which has no
-   `_inline_layout_start`), so `#`-only groups lack the deferred level
-   entirely; the corpus's real shapes all use `#!`, which works.
+**Known residual: tabview.icl +1** — the binding branch's
+`optional($._layout_end)` can consume the *enclosing* block's END: in
+`instance` member lists the group's END-steal leaves the member-list
+closer with nothing, producing one `MISSING ";"` (the member itself
+escapes to top level, which is pre-existing at HEAD). Removing the END
+optionals fixes tabview but costs +338 across 17 files — the END is worth
+keeping. A scanner-level fix (only emit the group's END when the column
+matches the group, never an enclosing block's) is the remaining lever.
 
 ## 3. ~~Dot-less strict array index `a![i]`~~ — FIXED
 
