@@ -251,7 +251,7 @@ stranded the trailing `.field` and regressed PmDirCache +5. Corpus:
 action id 61283. New corpus test covers `a![i]`, `a!.[i]`, `a.[i]`,
 `a![i].field`, and bare `arr [i]` (still an application).
 
-## 4. Deeper-column continuation bindings
+## 4. ~~Deeper-column continuation bindings~~ — PARTIALLY CLOSED (guard/case body blocks, post-902130e)
 
 `# a = e` followed by a binding indented deeper than the group:
 
@@ -314,21 +314,44 @@ the 239-file corpus (791 vs 804), 83/83 tests, action-table ceiling
   pollution is small: per-file, PmDirCache 22→14, PmAbcMagic 49→43,
   and the only regression is PmDriver 31→32 (+1).
 
-What remains open is the *scanner* half of gap #4. Re-adding the
-scanner-side SEMICOLON branch (binding-shaped deeper lines, zero-width
-SEMICOLON) on top of these grammar fixes still measures **+7** on the
-corpus (811 vs 804): it fixes coloured_line 35→0, PmDirCache 15,
-projdocument 29, PmCleanSystem 5, and PmPath 14, but breaks the
-where-block membership via GLR fork priority (PmFileInfo 4→49: the
-SEMICOLON splits a guard-body continuation correctly, but the extra
-forks push the 11-version GLR race past the where-block-continue fork,
-escaping the whole declaration) and trips the error-recovery phantom
-stack in case bodies (PmDriver 31→50 with a whole-file ERROR). A
-workable scanner-side fix needs to emit the separator without creating
-the extra LALR fork — likely the `[$._binding_tail]`-style GLR fork
-applied at the layoutBlockMembers separator, which the current
-shared-rule structure does not expose — a structural redesign, not an
-additive fix.
+### CLOSED for guard/case body blocks (post-902130e) — scanner-side separator
+
+The scanner half is now closed for the *guard/case body block* case
+(LEVEL_KIND_START levels). At a block-member boundary the scanner peeks
+each binding-shaped deeper line (a top-level `=`, outside strings/chars
+and bracket nesting, excluding `#`/`|`/`=` starters and `where`/`with`
+keywords) and emits a zero-width LAYOUT_SEMICOLON, letting the parser
+reduce the previous member and continue the block with a
+`continuation_binding`. Measured on the 239-file corpus: **791 → 731
+(−60)**, 83/83 tests, action-table ceiling unchanged at 64042.
+
+Two exclusions were essential (both measured):
+
+- **Multi-line record values** (`x = { ... }` with the `}` on a later
+  line): self-delimited by the `}`, and separating the binding disturbs
+  the where-block GLR fork (PmFileInfo 4→49 without it). Single-line
+  records (`subdirs & [i]={...}`) still get the separator — they need
+  it (suppressing them was PmDirCache 62).
+- **`where`/`with` keyword lines** (StdList +4 without it): they attach
+  a nested block, never a continuation.
+
+Wins: coloured_line 35→0, PmDriver 32→19, PmCleanSystem 9→4,
+projdocument 31→29 (real `#!`-group continuation fixes), PmPath 16→14,
+projactions 3→0, Process 3→2. The only regression is PmDirCache 14→15
+(+1): the guard-body fix changes DC_HSearch's block member structure
+and the following `setup_h` signature boundary mis-nests slightly worse
+— the same GLR fork-priority class as the PmFileInfo where-block escape
+above, but on a 1-error scale. The `_binding_tail`-style GLR fork at
+the separator was tried on top (named `_guard_body_members` rule +
+self-conflict, table 63376 < 65535) but measured neutral for PmDirCache
+and +1 projdocument — reverted.
+
+Still open: the INLINE-level case (function guard lists / where-block
+member levels, e.g. projdocument's `#!`-group `ptr = malloc 16` lines).
+Those levels have no `continuation_binding` member, so the separator
+error-recoveries into a phantom stack (PmDriver whole-function
+wrappers) and the lines remain silently swallowed as application
+arguments — a pre-existing misparse, unchanged.
 
 ## 5. ~~Record update by type name: `{ T | field = value, ... }`~~ — FIXED in v1.2.3
 
