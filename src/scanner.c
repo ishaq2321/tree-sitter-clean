@@ -257,6 +257,139 @@ static bool try_scan_block_comment(TSLexer *lexer, uint32_t *col) {
  * keyword case is re-lexed by the internal lexer), and the non-keyword
  * case re-lexes the word too because the caller marks the token end
  * BEFORE the word (a zero-width separator). */
+/* The lexer is positioned at the first token of a line (a newline was just
+ * crossed). Peek the whole line and report whether it is binding-shaped: a
+ * top-level `=` (outside strings, chars, and bracket nesting) appears before
+ * the line ends — the signature of a continuation binding (`pat = expr`,
+ * `pat & fields = expr`, `(tuple) = expr`). A deeper line with no such `=`
+ * is an ordinary multi-line expression continuation and must NOT be
+ * separated. The peek consumes characters (skip=false) but the caller marks
+ * the token end BEFORE calling, so a true result emits a zero-width token
+ * and the parser re-lexes the line; a false result is rewound by the
+ * runtime. The `=` in `==`, `=>`, `=:`, `!=`, `<=`, `>=` is not a binding
+ * equals (the neighbouring character disambiguates it). */
+static bool is_where_or_with_keyword(TSLexer *lexer); /* defined below */
+static bool binding_shape_at_line_start(TSLexer *lexer) {
+  int32_t c = lexer->lookahead;
+  if (c == '#' || c == '|' || c == '=') {
+    return false;
+  }
+  /* A `where`/`with` line attaches a nested block to the current
+   * declaration — never a continuation binding (StdList's `with (ys,zs) =
+   * span p xs`). */
+  if (c == 'w' && is_where_or_with_keyword(lexer)) {
+    return false;
+  }
+  unsigned depth = 0;
+  int32_t prev = 0; /* char before the current one (for `=` disambiguation) */
+  for (;;) {
+    c = lexer->lookahead;
+    if (c == 0 || is_newline(c)) {
+      return false; /* line ended without a top-level binding `=` */
+    }
+    if (c == '"') {
+      /* string literal: skip to the closing quote (escapes are just chars) */
+      lexer->advance(lexer, false);
+      while (lexer->lookahead != '"' && lexer->lookahead != 0 &&
+             !is_newline(lexer->lookahead)) {
+        lexer->advance(lexer, false);
+      }
+      if (lexer->lookahead == '"') {
+        lexer->advance(lexer, false);
+      }
+      prev = '"';
+      continue;
+    }
+    if (c == '\'') {
+      /* char literal or single-quoted module name: skip to the closing
+       * quote (two quotes in a row is neither — fall through) */
+      lexer->advance(lexer, false);
+      if (lexer->lookahead != '\'') {
+        while (lexer->lookahead != '\'' && lexer->lookahead != 0 &&
+               !is_newline(lexer->lookahead)) {
+          lexer->advance(lexer, false);
+        }
+        if (lexer->lookahead == '\'') {
+          lexer->advance(lexer, false);
+        }
+      }
+      prev = '\'';
+      continue;
+    }
+    if (c == '(' || c == '[' || c == '{') {
+      depth++;
+    } else if (c == ')' || c == ']' || c == '}') {
+      if (depth > 0) {
+        depth--;
+      } else {
+        return false;
+      }
+    } else if (c == '=' && depth == 0) {
+      /* A binding equals: not part of `==`, `=>`, `=:`, `!=`, `<=`, `>=`. */
+      lexer->advance(lexer, false);
+      int32_t next = lexer->lookahead;
+      bool op_like =
+          (prev == '=' || prev == '!' || prev == '<' || prev == '>') ||
+          (next == '=' || next == '>' || next == ':');
+      if (op_like) {
+        return false;
+      }
+      /* A binding whose value is a record literal. A MULTI-LINE record
+       * (`finfo = { ... }` with the `}` on a later line) is self-delimited
+       * by its `}`; separating the binding here disturbs the enclosing
+       * block's GLR fork (PmFileInfo's where-block escape). Leave those to
+       * the committed parse. A record that closes on the SAME line is safe
+       * to separate — record-update bindings like `subdirs & [i]={...}`
+       * need the separator. */
+      while (next == ' ' || next == '\t') {
+        lexer->advance(lexer, false);
+        next = lexer->lookahead;
+      }
+      if (next == '{') {
+        unsigned rdepth = 1;
+        for (;;) {
+          lexer->advance(lexer, false);
+          c = lexer->lookahead;
+          if (c == 0 || is_newline(c)) {
+            return false; /* record spans lines — leave to committed parse */
+          }
+          if (c == '"') {
+            lexer->advance(lexer, false);
+            while (lexer->lookahead != '"' && lexer->lookahead != 0 &&
+                   !is_newline(lexer->lookahead)) {
+              lexer->advance(lexer, false);
+            }
+            if (lexer->lookahead == '"') {
+              lexer->advance(lexer, false);
+            }
+          } else if (c == '\'') {
+            lexer->advance(lexer, false);
+            if (lexer->lookahead != '\'') {
+              while (lexer->lookahead != '\'' && lexer->lookahead != 0 &&
+                     !is_newline(lexer->lookahead)) {
+                lexer->advance(lexer, false);
+              }
+              if (lexer->lookahead == '\'') {
+                lexer->advance(lexer, false);
+              }
+            }
+          } else if (c == '{') {
+            rdepth++;
+          } else if (c == '}') {
+            rdepth--;
+            if (rdepth == 0) {
+              break; /* record closed on this line */
+            }
+          }
+        }
+      }
+      return true;
+    }
+    lexer->advance(lexer, false);
+    prev = c;
+  }
+}
+
 static bool is_where_or_with_keyword(TSLexer *lexer) {
   char word[8];
   unsigned len = 0;
@@ -285,7 +418,8 @@ static bool scan_impl(void *payload, TSLexer *lexer, const bool *valid_symbols) 
   const bool want_semi = valid_symbols[LAYOUT_SEMICOLON];
   const bool want_start = valid_symbols[LAYOUT_START];
   const bool want_inline = valid_symbols[LAYOUT_INLINE_START];
-  const bool want_end = valid_symbols[LAYOUT_END];  if (valid_symbols[BLOCK_COMMENT]) {
+  const bool want_end = valid_symbols[LAYOUT_END];
+  if (valid_symbols[BLOCK_COMMENT]) {
     uint32_t ignore_col = 0;
     if (try_scan_block_comment(lexer, &ignore_col)) {
       lexer->result_symbol = BLOCK_COMMENT;
@@ -619,6 +753,38 @@ past_dedent:
          s->level_kind[s->indent_size - 1] == LEVEL_KIND_INLINE);
     if (!skip_sep) {
       lexer->mark_end(lexer);
+      lexer->result_symbol = LAYOUT_SEMICOLON;
+      return true;
+    }
+  }
+
+  /* 8) A line DEEPER than the current block level whose first token is a
+   *    binding (`pat = expr` with a top-level `=`) starts a continuation
+   *    member of the enclosing block — emit a zero-width LAYOUT_SEMICOLON
+   *    so the parser reduces the previous member's value expression and
+   *    continues the block. A deeper line is otherwise lexically
+   *    indistinguishable from a multi-line application continuation; only
+   *    the binding shape (a top-level `=`) tells them apart, and only when
+   *    a block level is actually open (a binding line at the ROOT is a
+   *    fresh declaration, never a continuation). `#`/`|`/`=` starters are
+   *    excluded: they begin new group members, guards, or bodies that the
+   *    same-column machinery already separates.
+   *
+   *    The top level must be LEVEL_KIND_START (a guard/case/let block whose
+   *    member list includes continuation_binding): inside a where/with
+   *    member level (INLINE) the deeper binding would join the FUNCTION's
+   *    guard list, whose member choice has no continuation_binding, and
+   *    the emitted separator would error-recover into a phantom stack
+   *    (PmDriver's whole-function wrappers). The INLINE case is left as
+   *    before (the binding is silently swallowed as an application
+   *    argument — the pre-existing behaviour). */
+  if (want_semi && crossed_newline && col > current && s->indent_size > 1 &&
+      s->level_kind[s->indent_size - 1] == LEVEL_KIND_START) {
+    /* mark_end BEFORE the peek: the helper consumes the line (skip=false),
+     * and the zero-width token must cover [start, start) so the parser
+     * re-lexes the line after the separator. */
+    lexer->mark_end(lexer);
+    if (binding_shape_at_line_start(lexer)) {
       lexer->result_symbol = LAYOUT_SEMICOLON;
       return true;
     }
