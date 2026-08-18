@@ -712,3 +712,30 @@ precedence as `generator_sep` (longest-match picks `<-:` whole) added to
 the `generator` rule. outlineviewcontroller 83 → 2, CloogleServer 65 →
 28, and smaller wins in _SystemDynamic, UtilOptions, PmPath,
 projwindowcontroller, Array.
+
+### Re-measured dead ends (post-v1.2.4, before v1.2.5)
+
+Two further attempts at the remaining clusters, both measured on the
+239-file corpus at the 487-error state and reverted:
+
+- **`continuation_binding` in the two `function_declaration` guard-list
+  member choices** (the INLINE gap — PmParse's `# x = ...` + deeper
+  `y = inc x;` derail). Fixes the FindSym shape (probe 12→0) but the
+  shared guard-list states pollute every guard-bearing file: **487 →
+  665 (+178)** — PmParse +62, UtilStrictLists +45, StdPathname +20,
+  _SystemArray.dcl +18, PmProject +13, PmAbcMagic +11. The table also
+  went 64767 → 65399 (136 headroom left). This is the +82 gap-#4
+  measurement, re-confirmed on the current grammar: the function
+  guard-list member choices cannot take the continuation rule.
+- **`_`-prefixed constructors** (`constructor: (?:[A-Z]|_[A-Z])[...]` —
+  the stdlib's `_Nil`, `_Pointer`, `_TypeFixedVar`). Probe fixes and
+  PmAbcMagic 32→11, PmParse −11, _SystemDynamic −7, but a lexer-DFA
+  perturbation (PmProject has zero `_`-uppercase names yet +41) made the
+  net **+6 regression** (493 vs 487) and turned PmAbcMagic into a
+  whole-file [0,0] ERROR. The underscore-constructor gap needs a
+  context-sensitive (pattern-position-only) solution, not a lexical one.
+
+Both are recorded here so the v1.2.5 release at 487 is a known,
+documented plateau: the remaining errors are these two families plus the
+pre-existing `;`-chain and _System-module issues — none reachable by an
+additive change without breaking the shared automaton states.
