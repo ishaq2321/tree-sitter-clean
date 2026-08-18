@@ -3,6 +3,31 @@
 All notable changes to `tree-sitter-clean` are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
+## [v1.2.5] - 2026-08-18
+
+Three additive grammar fixes, verified against the 239-file Clean corpus
+(Clyde, clean-stdlib, Eastwood) and `npx tree-sitter test` (83/83 green):
+
+- **Dotted field paths in record updates**: `{ r & a.b.c = v }`,
+  `{ r & cache.[i] = v }`, `{ T | tde_typedef.td_name = "Bool" }`.
+  Predef 57→28 (its `builtin_classes` record list had derailed the whole
+  file head into one recovery ERROR), PmProject 35→9, PmAbcMagic 43→32,
+  PmFileInfo 4→0.
+- **Explicit-default record base**: `{ TypeDoc | gDefault{|*|} &
+  description = ... }` — a type-named update starting from an explicit
+  default record expression instead of the implicit generic default.
+- **`<-:` array element generator**: `{f x \\ x <-: arr}` now lexes as one
+  token (was `<-` + `:`, breaking every array comprehension).
+  outlineviewcontroller 83→2, CloogleServer 65→28, plus _SystemDynamic,
+  UtilOptions, PmPath, projwindowcontroller, Array.
+
+Corpus result: **487 parse errors**, down from **731 in v1.2.4 (−244)**
+with **zero file regressions** (every file improved or stayed the same).
+Action-table ceiling 64767 (< 65535), 0 overflow warnings. The remaining
+errors are documented in GRAMMAR-GAPS.md as a measured plateau — the
+INLINE deeper-binding family and `_`-prefixed constructors, both shown
+unreachable by additive changes (re-measured and reverted).
+
 ## [v1.2.4] - 2026-08-18
 
 Parsing fixes, all verified against the 239-file Clean corpus (Clyde,
@@ -47,3 +72,4 @@ PmDirCache.icl. Action-table ceiling unchanged at 64042 (< 65535).
 [v1.2.0]: https://github.com/ishaq2321/tree-sitter-clean/releases/tag/v1.2.0
 [v1.2.3]: https://github.com/ishaq2321/tree-sitter-clean/releases/tag/v1.2.3
 [v1.2.4]: https://github.com/ishaq2321/tree-sitter-clean/releases/tag/v1.2.4
+[v1.2.5]: https://github.com/ishaq2321/tree-sitter-clean/releases/tag/v1.2.5
