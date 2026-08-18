@@ -674,3 +674,41 @@ range-rule removal) silently truncated one table entry
 (`ACTIONS(65537)` → `RECOVER` on a `with`-block inline-layout state); the
 corpus measured identical (1378), but it is a latent corruption — do not
 ship without the headroom.
+
+## 9. Post-v1.2.4 easy wins (487-corpus pass)
+
+Three additive fixes measured on the 239-file corpus, **791 → 487
+(−304)** from the d3d9b5f-era baseline (731 → 487 since 902130e), 83/83
+tests, action-table ceiling **64767** (< 65535), 0 overflow warnings.
+The only regression remains PmDirCache +1 (the 902130e boundary shift).
+
+### 9a. Dotted field paths in record updates
+
+`update_field` accepted only a bare identifier or `[index]`. Clean
+updates any selector path: `{ r & a.b.c = v }`, `{ r & cache.[i] = v }`
+(PmAbcMagic's `cache.[cache_index]`), `{ T | tde_typedef.td_name = "Bool" }`.
+Added a dotted/indexed `repeat1` path to `update_field` (+27 table ids).
+This alone cleared Predef's 57 → 28 and PmProject's 35 → 9 — Predef's
+`builtin_classes` record list had been derailing the whole file head into
+one [0,0]-[139,5] recovery ERROR.
+
+### 9b. `{ T | default & f = v }` — explicit default record base
+
+Predef's `{ TypeDoc | gDefault{|*|} & description = ... }`: a type-named
+update whose base is an explicit default expression instead of the
+implicit generic default. A full `_expression` base after the pipe blew
+the action table (68180 > 65535 — the base forks against `update_field`
+at every `{ r & ident`, and the `&`/`|` branch split to avoid it doubled
+the damage). Restricted the base to `identifier` + optional
+`kind_expression` (`gDefault{|*|}`) — the only shape the corpus uses —
+for +696 ids (64765, fits).
+
+### 9c. `<-:` array element generator
+
+`{f x \\ x <-: arr}` lexed `<-:` as `<-` + `:` (cons) and errored —
+outlineviewcontroller's comprehensions (83 errors) and CloogleServer's
+(65). A dedicated `array_generator_sep` token at the same lexical
+precedence as `generator_sep` (longest-match picks `<-:` whole) added to
+the `generator` rule. outlineviewcontroller 83 → 2, CloogleServer 65 →
+28, and smaller wins in _SystemDynamic, UtilOptions, PmPath,
+projwindowcontroller, Array.

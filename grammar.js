@@ -1937,7 +1937,7 @@ module.exports = grammar({
     generator: ($) =>
       seq(
         field("pattern", $._pattern),
-        choice($.generator_sep, $.operator_pipe),
+        choice($.generator_sep, $.array_generator_sep, $.operator_pipe),
         field("expression", $._expression),
       ),
 
@@ -1983,6 +1983,14 @@ module.exports = grammar({
         // matches `|`, and in a tie the lexer picks the higher precedence —
         // without this, `{ T | f = v }` lexes `|` as an operator.
         choice("&", $._pipe),
+        // `{ T | default & f = v }` — a type-named update with an EXPLICIT
+        // default record expression instead of the implicit generic default
+        // (Predef's `{ TypeDoc | gDefault{|*|} & description = ... }`). The
+        // base is restricted to an identifier with an optional generic-kind
+        // marker (`gDefault{|*|}`) — a full `_expression` base would fork
+        // against update_field at every field and blew the action table
+        // (68180 > 65535). The corpus only uses this shape.
+        optional(seq($.identifier, optional($.kind_expression), "&")),
         $._record_update_fields,
         "}",
       ),
@@ -1998,12 +2006,23 @@ module.exports = grammar({
       ),
 
 
-    // The LHS of one update binding: either a record field name or an array
-    // index. For array element updates Clean allows a range too: `& [i..j] = v`.
+    // The LHS of one update binding: a record field name, an array index
+    // (`& [i..j] = v` — Clean allows a range), or a dotted field path
+    // (`& a.b.c = v`, `& cache.[i] = v` — Clean updates any selector path,
+    // mirroring field_access on the expression side).
     update_field: ($) =>
       choice(
         $.identifier,
         seq("[", $._expression, optional(seq("..", optional($._expression))), "]"),
+        seq(
+          $.identifier,
+          repeat1(
+            choice(
+              seq(".", $.identifier),
+              seq(".", "[", $._expression, optional(seq("..", optional($._expression))), "]"),
+            ),
+          ),
+        ),
       ),
 
     // ---- ABC inline code ----
@@ -2203,6 +2222,13 @@ module.exports = grammar({
     // by a unary `-`. A guard like `x < 3` (with whitespace) still lexes `<`
     // alone because the token requires the adjacent `-`.
     generator_sep: ($) => token(prec(10, "<-")),
+
+    // `<-:` — the array element generator separator (`{f x \\ x <-: arr}`).
+    // A dedicated token at the same precedence as generator_sep: longest-match
+    // picks `<-:` whole so it never splits into `<-` + `:` (cons operator),
+    // which is what broke the array comprehensions in outlineviewcontroller
+    // and CloogleServer.
+    array_generator_sep: ($) => token(prec(10, "<-:")),
 
     // Arrow — must be a dedicated high-precedence token to beat
     // `operator_add` (`-`) + `operator_compare` (`>`) tokenization.

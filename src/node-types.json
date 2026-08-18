@@ -1925,6 +1925,10 @@
       "required": true,
       "types": [
         {
+          "type": "array_generator_sep",
+          "named": true
+        },
+        {
           "type": "generator_sep",
           "named": true
         },
@@ -3584,6 +3588,20 @@
           }
         ]
       }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "kind_expression",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -4659,6 +4677,10 @@
   {
     "type": "apply",
     "named": false
+  },
+  {
+    "type": "array_generator_sep",
+    "named": true
   },
   {
     "type": "arrow",
