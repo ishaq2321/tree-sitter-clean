@@ -1,6 +1,6 @@
 {
   "name": "tree-sitter-clean",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "description": "Clean grammar for tree-sitter",
     "repository": {
     "type": "git",
