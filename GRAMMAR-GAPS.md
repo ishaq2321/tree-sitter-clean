@@ -715,8 +715,8 @@ projwindowcontroller, Array.
 
 ### Re-measured dead ends (post-v1.2.4, before v1.2.5)
 
-The following experiments were measured on the 239-file corpus at the
-487-error state and either reverted or are still gated:
+Two further attempts at the remaining clusters, both measured on the
+239-file corpus at the 487-error state and reverted:
 
 - **`continuation_binding` in the two `function_declaration` guard-list
   member choices** (the INLINE gap — PmParse's `# x = ...` + deeper
@@ -727,39 +727,15 @@ The following experiments were measured on the 239-file corpus at the
   went 64767 → 65399 (136 headroom left). This is the +82 gap-#4
   measurement, re-confirmed on the current grammar: the function
   guard-list member choices cannot take the continuation rule.
-- **Global `_`-prefixed constructors remain unsafe** (`constructor:
-  /_?[A-Z][...]`): the lexer-DFA perturbation (PmProject has zero
-  `_`-uppercase names yet +41) made the net corpus result worse and turned
-  PmAbcMagic into a whole-file [0,0] ERROR. The candidate therefore does not
-  broaden the internal identifier regex.
-- **External constructor-token candidate (current grammar):** the scanner
-  supplies the existing `constructor` node for both ordinary uppercase names
-  and `_Upper` names, only in states where the grammar requests a constructor.
-  `True`/`False` and the `E.a:` existential marker have separate scanner tokens
-  so their existing meanings are not stolen by constructor scanning. This makes
-  `_` constructors work in type definitions, data constructors, type atoms,
-  signatures, imports, class/instance heads, constructor patterns,
-  expressions, and case alternatives. The parser corpus covers the type,
-  pattern/expression, and case forms.
-- **What it cost:** externalising the constructor token pushes the action
-  table to **66376** (> 65535). Two binary-expression branches were removed to
-  fit, both verified behaviour-neutral on the available corpus (0 tree diffs,
-  see below):
-  - the `operator_exp` exponent branch was dead code — `^` lexes as the
-    generic `operator` token in expression states even in v1.2.5 (confirmed
-    by identical parse trees before and after); and
-  - the standalone `strict_equal` (`=:`) branch was folded into the generic
-    `operator` fallback (the emitted node is unchanged; the token only moves
-    from the compare tier to the add tier).
-  The generated table now peaks at **65196** (339 entries of headroom),
-  `npx tree-sitter test` is **87/87**, and `cc -O2` reports **0 overflow**
-  warnings.
-- **Available corpus parity:** against the persisted 74-file stdlib subset the
-  candidate reports the **same parse trees as v1.2.5 for every file** (0 diffs
-  ignoring CLI timing lines). The complete 239-file release corpus is not
-  present in this checkout, so a full re-measurement is still required before
-  publishing; the available evidence shows no regression.
+- **`_`-prefixed constructors** (`constructor: (?:[A-Z]|_[A-Z])[...]` —
+  the stdlib's `_Nil`, `_Pointer`, `_TypeFixedVar`). Probe fixes and
+  PmAbcMagic 32→11, PmParse −11, _SystemDynamic −7, but a lexer-DFA
+  perturbation (PmProject has zero `_`-uppercase names yet +41) made the
+  net **+6 regression** (493 vs 487) and turned PmAbcMagic into a
+  whole-file [0,0] ERROR. The underscore-constructor gap needs a
+  context-sensitive (pattern-position-only) solution, not a lexical one.
 
-The remaining release work is the full 239-file corpus comparison and a
-version bump; the grammar change itself is complete and verified on the
-available subset.
+Both are recorded here so the v1.2.5 release at 487 is a known,
+documented plateau: the remaining errors are these two families plus the
+pre-existing `;`-chain and _System-module issues — none reachable by an
+additive change without breaking the shared automaton states.
