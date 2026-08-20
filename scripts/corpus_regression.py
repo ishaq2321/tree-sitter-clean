@@ -28,9 +28,15 @@ Options:
   --list-new          Also print corpus files that have no baseline entry
                       (they are reported but do not fail the gate).
 
+The per-file metric is problem nodes = ERROR nodes + MISSING tokens (the
+phantom symbols error recovery inserts). MISSING-only regressions are real
+tree-shape damage that an ERROR-only count silently ignores (a `#`-group's
+END-steal can leave an instance member-list closer as a MISSING `;` with
+zero ERROR nodes), so the gate fails on either kind.
+
 Exit codes:
-  0  no file gained ERROR nodes relative to the baseline
-  1  at least one file gained ERROR nodes (a regression)
+  0  no file gained problem nodes relative to the baseline
+  1  at least one file gained problem nodes (a regression)
   2  usage / environment error
 """
 
@@ -83,12 +89,22 @@ def load_parser(so_path):
     return Parser(lang)
 
 
-def count_errors(root):
+def count_problems(root):
+    """Count syntax problems under `root`: ERROR nodes plus MISSING tokens.
+
+    ERROR counts alone miss tree-shape regressions that error recovery
+    absorbs silently: a `#`-group's END-steal can leave an `instance`
+    member-list closer as a MISSING `;` without a single ERROR node (Clyde's
+    tabview.icl parses "clean" by the ERROR metric while carrying two
+    MISSING tokens). MISSING tokens are the phantom symbols the parser
+    inserts during recovery, so they are a real quality signal. A node is
+    counted at most once (a MISSING ERROR node is one problem).
+    """
     total = 0
     stack = [root]
     while stack:
         node = stack.pop()
-        if node.type == "ERROR" or node.is_error:
+        if node.type == "ERROR" or node.is_error or node.is_missing:
             total += 1
         stack.extend(node.children)
     return total
@@ -124,7 +140,7 @@ def write_baseline(path, counts):
     total = sum(counts.values())
     with open(path, "w", encoding="utf-8") as fh:
         fh.write("# tree-sitter-clean corpus regression baseline\n")
-        fh.write("# ERROR nodes per file, generated with --save-baseline.\n")
+        fh.write("# ERROR + MISSING nodes per file, generated with --save-baseline.\n")
         fh.write("# Regenerate after a verified release so the next gate "
                  "compares against it.\n")
         fh.write("# total: %d\n" % total)
@@ -163,7 +179,7 @@ def main(argv):
         rel = os.path.relpath(path, corpus_root)
         with open(path, "rb") as fh:
             data = fh.read()
-        counts[rel] = count_errors(parser.parse(data).root_node)
+        counts[rel] = count_problems(parser.parse(data).root_node)
 
     current_total = sum(counts.values())
 
@@ -190,9 +206,9 @@ def main(argv):
 
     print("corpus:   %s" % corpus_root)
     print("files:    %d parsed" % len(counts))
-    print("baseline: %d ERROR nodes (%s)"
+    print("baseline: %d problem nodes (ERROR+MISSING) (%s)"
           % (baseline_total, os.path.basename(args.baseline)))
-    print("current:  %d ERROR nodes" % current_total)
+    print("current:  %d problem nodes (ERROR+MISSING)" % current_total)
     print("delta:    %+d" % (current_total - baseline_total))
 
     if new_files:

@@ -64,13 +64,17 @@ Set them with `gh secret set NAME -R ishaq2321/tree-sitter-clean`.
    npm run regress -- --corpus /path/to/all-corpus-repos --list-new
    ```
 
-   The gate parses every `.icl`/`.dcl` under `--corpus`, counts ERROR nodes
-   per file, and fails if any file has more errors than the checked-in
-   `scripts/corpus-baseline.tsv` (generated from v1.2.5). It prints a total
-   per corpus and per-file deltas. After a release is verified, refresh the
-   baseline with `--save-baseline`. Error-recovery cascades mean a single
-   new construct can change a file's count by hundreds, so watch the
-   per-corpus totals, not just individual files.
+   The gate parses every `.icl`/`.dcl` under `--corpus`, counts problem
+   nodes per file (ERROR nodes + MISSING tokens — the phantom symbols error
+   recovery inserts, e.g. a `#`-group's END-steal leaving an `instance`
+   member-list closer as a MISSING `;` with zero ERROR nodes), and fails if
+   any file has more problems than the checked-in `scripts/corpus-baseline.tsv`
+   (generated from v1.2.5: 312 files, 1013 problem nodes = 872 ERROR + 141
+   MISSING). It prints a total per corpus and per-file deltas. After a
+   release is verified, refresh the baseline with `--save-baseline`.
+   Error-recovery cascades mean a single new construct can change a file's
+   count by hundreds, so watch the per-corpus totals, not just individual
+   files.
 
 5. **Commit and push master**, then **create and push the tag** (this
    triggers the publish workflow):
