@@ -662,10 +662,6 @@
             "named": true
           },
           {
-            "type": "operator_exp",
-            "named": true
-          },
-          {
             "type": "operator_mul",
             "named": true
           },
@@ -4656,10 +4652,6 @@
   },
   {
     "type": "=>",
-    "named": false
-  },
-  {
-    "type": "E",
     "named": false
   },
   {

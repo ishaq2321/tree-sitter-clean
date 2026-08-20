@@ -80,13 +80,21 @@ module.exports = grammar({
   // External tokens produced by the scanner in `src/scanner.c`:
   //   - the three layout tokens implement Clean's offside rule, and
   //   - `block_comment` is externalised so nested /* ... /* ... */ ... */ is
-  //     balanced correctly (Clean comments nest, unlike C).
+  //     balanced correctly (Clean comments nest, unlike C), and
+  //   - constructor and boolean tokens are emitted by the external scanner so
+  //     `_Upper` constructors can reuse the existing `constructor` node in
+  //     every grammar context without duplicating choices across the grammar,
+  //   - `_existential_marker` keeps the `E.a:` existential spelling distinct
+  //     from an ordinary constructor beginning with `E`.
   externals: ($) => [
     $._layout_semicolon,
     $._layout_start,
     $._inline_layout_start,
     $._layout_end,
     $.block_comment,
+    $.constructor,
+    $.boolean,
+    $._existential_marker,
   ],
 
   // `word` enables keyword extraction so reserved words used as string
@@ -658,7 +666,7 @@ module.exports = grammar({
         // so the longer-match rule separates it from a plain `E` constructor.
         seq(
           "=",
-          "E",
+          $._existential_marker,
           ".",
           field("existential", $.type_variable),
           ":",
@@ -1615,21 +1623,27 @@ module.exports = grammar({
     //   2. Keep a generic `operator` token (catch-all) at a default tier, so
     //      user-defined operators still parse into a well-formed
     //      `binary_expression` with left associativity.
+    //
+    // NOTE: two formerly-standalone branches live inside other choices here
+    // to keep the externalised constructor token within the 16-bit action
+    // table budget (see GRAMMAR-GAPS.md):
+    //   - `^` has no `operator_exp` branch: in expression states `^` lexes as
+    //     the generic `operator` token anyway (verified identical in v1.2.5),
+    //     so the old recursive branch was dead code.
+    //   - `=:` (strict_equal) is folded into the generic fallback below; the
+    //     emitted node is unchanged.
+    // Re-adding either branch pushes the table past 65536 (65786).
     binary_expression: ($) =>
       choice(
         prec.left(PREC.OR, seq($._expression, field("operator", $.operator_or), $._expression)),
         prec.left(PREC.AND, seq($._expression, field("operator", $.operator_and), $._expression)),
         prec.left(PREC.COMPARE, seq($._expression, field("operator", $.operator_compare), $._expression)),
-        // `m =: ?|Just _` — strict match/equality in expression position
-        // (the same `=:` token that strict_binding_pattern uses in patterns)
-        prec.left(PREC.COMPARE, seq($._expression, field("operator", $.strict_equal), $._expression)),
         prec.right(PREC.RANGE, seq($._expression, $.range_operator, $._expression)),
         prec.left(PREC.ADD, seq($._expression, field("operator", $.operator_add), $._expression)),
         prec.left(PREC.MULTIPLY, seq($._expression, field("operator", $.operator_mul), $._expression)),
         // `a * b` — the star token always wins the lex over operator_mul, so
         // multiplication must accept it as the operator too
         prec.left(PREC.MULTIPLY, seq($._expression, field("operator", $.uniqueness_star), $._expression)),
-        prec.right(PREC.EXPONENT, seq($._expression, field("operator", $.operator_exp), $._expression)),
         prec.right(PREC.CONSTRUCTOR, seq($._expression, field("operator", $.operator_cons), $._expression)),
         // `x:!xs` — strict cons (forces the tail)
         prec.right(PREC.CONSTRUCTOR, seq($._expression, field("operator", $.operator_cons_strict), $._expression)),
@@ -1641,7 +1655,7 @@ module.exports = grammar({
         prec.left(PREC.EXPONENT, seq($._expression, field("operator", "!!"), $._expression)),
         // generic fallback for any other operator symbol (including
         // `|`-containing operators like `++|`, `<|-` — see operator_pipe)
-        prec.left(PREC.ADD, seq($._expression, field("operator", choice($.operator, $.operator_pipe)), $._expression)),
+        prec.left(PREC.ADD, seq($._expression, field("operator", choice($.operator, $.operator_pipe, $.strict_equal)), $._expression)),
         // dot operators (`x +++. y` — the stdlib's string append `+++.`)
         prec.left(PREC.ADD, seq($._expression, field("operator", $.operator_dot), $._expression)),
       ),
@@ -2114,15 +2128,6 @@ module.exports = grammar({
     // Lexical tokens
     // ─────────────────────────────────────────────────────────────────────
 
-    // A constructor is an identifier beginning with an uppercase letter.
-    // Declared before `identifier` so the more-specific rule wins. Trailing
-    // backticks are allowed in Clean identifiers (`xs``, like Haskell primes).
-    // NOTE: `_`-prefixed constructors (`_TypeFixedVar`) are NOT matched here —
-    // adding `_[A-Z]` pushes the generated action table past 65536 entries
-    // (silent table corruption; see GRAMMAR-GAPS.md). They lex as identifiers,
-    // which is the pre-existing accepted behaviour.
-    constructor: ($) => /[A-Z][a-zA-Z0-9_'`]*/,
-
     identifier: ($) => /[a-z_][a-zA-Z0-9_'`]*/,
 
     // Operator symbols.
@@ -2329,7 +2334,8 @@ module.exports = grammar({
 
     range_operator: ($) => token(prec(2, "..")),
 
-    boolean: ($) => token(prec(1, choice("True", "False"))),
+    // Boolean literals are emitted by the external scanner so constructor
+    // scanning can distinguish `True`/`False` from data constructors.
 
     integer: ($) => /[0-9]+/,
     float: ($) => /[0-9]+\.[0-9]+([eE][+-]?[0-9]+)?|[0-9]+[eE][+-]?[0-9]+/,

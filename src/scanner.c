@@ -18,7 +18,7 @@
  *
  * Token order in TokenType MUST match the externals array in grammar.js:
  *     _layout_semicolon, _layout_start, _inline_layout_start, _layout_end,
- *     block_comment
+ *     block_comment, constructor_token, boolean, existential_marker
  *
  * Design notes
  * ------------
@@ -51,6 +51,9 @@ enum TokenType {
   LAYOUT_INLINE_START,
   LAYOUT_END,
   BLOCK_COMMENT,
+  CONSTRUCTOR_TOKEN,
+  BOOLEAN_TOKEN,
+  EXISTENTIAL_MARKER,
 };
 
 #define MAX_INDENT_STACK 100
@@ -169,6 +172,12 @@ void tree_sitter_clean_external_scanner_deserialize(void *payload,
 
 static bool is_space(int32_t c) { return c == ' ' || c == '\t'; }
 static bool is_newline(int32_t c) { return c == '\n' || c == '\r'; }
+static bool is_identifier_char(int32_t c) {
+  return c == '_' || c == '\'' || c == '`' ||
+         (c >= '0' && c <= '9') ||
+         (c >= 'a' && c <= 'z') ||
+         (c >= 'A' && c <= 'Z');
+}
 
 /* Tabs expand to this many columns when measuring indentation. Clean's own
  * stdlib mixes tabs and spaces at the same visual level (e.g. `\t\t` and
@@ -406,6 +415,76 @@ static bool is_where_or_with_keyword(TSLexer *lexer) {
          (len == 4 && memcmp(word, "with", 4) == 0);
 }
 
+static bool scan_existential_marker(TSLexer *lexer) {
+  if (lexer->lookahead != 'E') {
+    return false;
+  }
+  lexer->advance(lexer, false);
+  if (lexer->lookahead != '.') {
+    return false;
+  }
+  lexer->mark_end(lexer);
+  return true;
+}
+
+static bool scan_boolean(TSLexer *lexer) {
+  if (lexer->lookahead != 'T' && lexer->lookahead != 'F') {
+    return false;
+  }
+  char word[6];
+  unsigned length = 0;
+  while (length < 5 &&
+         ((lexer->lookahead >= 'a' && lexer->lookahead <= 'z') ||
+          (lexer->lookahead >= 'A' && lexer->lookahead <= 'Z'))) {
+    word[length++] = (char)lexer->lookahead;
+    lexer->advance(lexer, false);
+  }
+  if ((length == 4 && memcmp(word, "True", 4) == 0) ||
+      (length == 5 && memcmp(word, "False", 5) == 0)) {
+    /* Match the internal keyword token's word boundary: `TrueValue` and
+     * `False_1` are identifiers, not a boolean followed by another token. */
+    if (is_identifier_char(lexer->lookahead)) {
+      return false;
+    }
+    lexer->mark_end(lexer);
+    return true;
+  }
+  return false;
+}
+
+/* The lexer is positioned at the beginning of a constructor name. Clean
+ * constructors start with an uppercase letter; the external path additionally
+ * accepts `_Foo` names without changing the broad identifier DFA. */
+static bool scan_constructor(TSLexer *lexer) {
+  if (lexer->lookahead == '_') {
+    lexer->advance(lexer, false);
+    if (!(lexer->lookahead >= 'A' && lexer->lookahead <= 'Z')) {
+      return false; /* `_`, `_foo`, `__x` — not a constructor */
+    }
+  } else if (lexer->lookahead >= 'A' && lexer->lookahead <= 'Z') {
+    /* `E.` is Clean's existential marker. The marker check runs first, but
+     * this guard also prevents the constructor path from stealing it in a
+     * state that does not request the marker token. */
+    if (lexer->lookahead == 'E') {
+      lexer->advance(lexer, false);
+      if (lexer->lookahead == '.') {
+        return false;
+      }
+    }
+  } else {
+    return false;
+  }
+  while (lexer->lookahead == '_' || lexer->lookahead == '\'' ||
+         lexer->lookahead == '`' ||
+         (lexer->lookahead >= 'a' && lexer->lookahead <= 'z') ||
+         (lexer->lookahead >= 'A' && lexer->lookahead <= 'Z') ||
+         (lexer->lookahead >= '0' && lexer->lookahead <= '9')) {
+    lexer->advance(lexer, false);
+  }
+  lexer->mark_end(lexer);
+  return true;
+}
+
 /* ---------- main scan entry -------------------------------------------- */
 
 static bool scan_impl(void *payload, TSLexer *lexer, const bool *valid_symbols) {
@@ -430,7 +509,10 @@ static bool scan_impl(void *payload, TSLexer *lexer, const bool *valid_symbols) 
     }
   }
 
-  if (!(want_semi || want_start || want_inline || want_end || valid_symbols[BLOCK_COMMENT])) {
+  if (!(want_semi || want_start || want_inline || want_end ||
+        valid_symbols[BLOCK_COMMENT] || valid_symbols[CONSTRUCTOR_TOKEN] ||
+        valid_symbols[BOOLEAN_TOKEN] || valid_symbols[EXISTENTIAL_MARKER])) {
+
     return false;
   }
 
@@ -488,7 +570,7 @@ static bool scan_impl(void *payload, TSLexer *lexer, const bool *valid_symbols) 
    * sibling separator (the first member is already parsed). Otherwise the
    * block held only the inline member: clear the flag and fall through, so
    * the normal logic emits the separator/end for the enclosing context. */
-  if (s->pending_block) {
+  if (s->pending_block && crossed_newline) {
     s->pending_block = false;
     /* Read and clear both flags up front: a pushed level (the early return
      * below) must not leave `pending_inline` set, or a later `special`
@@ -699,7 +781,7 @@ past_dedent:
       lexer->result_symbol = LAYOUT_INLINE_START;
       return true;
     }
-    return false;
+    goto maybe_constructor;
   }
 
   /* 6) More indented -> open a new block. */
@@ -788,6 +870,22 @@ past_dedent:
       lexer->result_symbol = LAYOUT_SEMICOLON;
       return true;
     }
+  }
+
+  /* 9) Constructor names are scanned only in parser states that request the
+   *    external constructor token. Layout decisions above take priority. */
+maybe_constructor:
+  if (valid_symbols[EXISTENTIAL_MARKER] && scan_existential_marker(lexer)) {
+    lexer->result_symbol = EXISTENTIAL_MARKER;
+    return true;
+  }
+  if (valid_symbols[BOOLEAN_TOKEN] && scan_boolean(lexer)) {
+    lexer->result_symbol = BOOLEAN_TOKEN;
+    return true;
+  }
+  if (valid_symbols[CONSTRUCTOR_TOKEN] && scan_constructor(lexer)) {
+    lexer->result_symbol = CONSTRUCTOR_TOKEN;
+    return true;
   }
 
   return false;
