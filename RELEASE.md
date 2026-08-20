@@ -56,9 +56,21 @@ Set them with `gh secret set NAME -R ishaq2321/tree-sitter-clean`.
      at least all 25 root `Std*.icl` files — these must be 0 errors)
    - `Clyde` + `cloogle.org` (all `.icl`/`.dcl`)
 
-   Count ERROR nodes per file with `npx tree-sitter parse <file> | grep -c ERROR`.
-   Error-recovery cascades mean a single new construct can change a file's
-   count by hundreds, so compare totals per corpus, not per file.
+   Count ERROR nodes per file with the cache-free regression gate
+   (`scripts/corpus_regression.py`) — NOT with ad-hoc `tree-sitter parse`
+   runs, which can silently compare a grammar against itself (see Gotchas):
+
+   ```bash
+   npm run regress -- --corpus /path/to/all-corpus-repos --list-new
+   ```
+
+   The gate parses every `.icl`/`.dcl` under `--corpus`, counts ERROR nodes
+   per file, and fails if any file has more errors than the checked-in
+   `scripts/corpus-baseline.tsv` (generated from v1.2.5). It prints a total
+   per corpus and per-file deltas. After a release is verified, refresh the
+   baseline with `--save-baseline`. Error-recovery cascades mean a single
+   new construct can change a file's count by hundreds, so watch the
+   per-corpus totals, not just individual files.
 
 5. **Commit and push master**, then **create and push the tag** (this
    triggers the publish workflow):
@@ -84,6 +96,14 @@ Set them with `gh secret set NAME -R ishaq2321/tree-sitter-clean`.
 
 ## Gotchas learned the hard way (v1.2.0)
 
+- **`tree-sitter parse` caches by language name, not source** — two
+  different grammars both named `clean` share one `~/.cache/tree-sitter`
+  entry, so a before/after corpus comparison without `-r` can compare a
+  grammar against itself (an underscore-constructor change was once
+  mis-measured as "0 regressions" while it added thousands of ERROR nodes).
+  Always use the cache-free gate (`scripts/corpus_regression.py`), or pass
+  `-r` to force a rebuild; never trust a "no regressions" result from bare
+  `tree-sitter parse` runs across two checkouts.
 - **`secrets` is not allowed in job-level `if:`** — GitHub rejects the
   whole workflow ("This run likely failed because of a workflow file
   issue"). The v1.2.0 workflow guards tokens *inside* the publish step
