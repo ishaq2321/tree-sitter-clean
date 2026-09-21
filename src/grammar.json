@@ -5963,8 +5963,17 @@
               "type": "SEQ",
               "members": [
                 {
-                  "type": "SYMBOL",
-                  "name": "constructor"
+                  "type": "CHOICE",
+                  "members": [
+                    {
+                      "type": "SYMBOL",
+                      "name": "constructor"
+                    },
+                    {
+                      "type": "SYMBOL",
+                      "name": "single_quoted_name"
+                    }
+                  ]
                 },
                 {
                   "type": "SYMBOL",
@@ -6577,6 +6586,10 @@
                     {
                       "type": "SYMBOL",
                       "name": "operator_pipe"
+                    },
+                    {
+                      "type": "SYMBOL",
+                      "name": "monad_bind"
                     }
                   ]
                 }
@@ -8916,6 +8929,10 @@
       "members": [
         {
           "type": "SYMBOL",
+          "name": "monad_bind"
+        },
+        {
+          "type": "SYMBOL",
           "name": "operator_compare"
         },
         {
@@ -9224,6 +9241,38 @@
         "content": {
           "type": "STRING",
           "value": "=:"
+        }
+      }
+    },
+    "monad_bind": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PREC",
+        "value": 1,
+        "content": {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "STRING",
+              "value": ">>="
+            },
+            {
+              "type": "STRING",
+              "value": "=<<"
+            },
+            {
+              "type": "STRING",
+              "value": ">>"
+            },
+            {
+              "type": "STRING",
+              "value": "<=<"
+            },
+            {
+              "type": "STRING",
+              "value": ">=>"
+            }
+          ]
         }
       }
     },

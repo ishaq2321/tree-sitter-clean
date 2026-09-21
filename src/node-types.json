@@ -634,6 +634,10 @@
             "named": true
           },
           {
+            "type": "monad_bind",
+            "named": true
+          },
+          {
             "type": "operator",
             "named": true
           },
@@ -847,6 +851,10 @@
           "named": true
         },
         {
+          "type": "monad_bind",
+          "named": true
+        },
+        {
           "type": "operator",
           "named": true
         },
@@ -1053,6 +1061,10 @@
         },
         {
           "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "monad_bind",
           "named": true
         },
         {
@@ -1752,6 +1764,10 @@
         "required": true,
         "types": [
           {
+            "type": "monad_bind",
+            "named": true
+          },
+          {
             "type": "operator",
             "named": true
           },
@@ -2336,6 +2352,10 @@
           "named": true
         },
         {
+          "type": "monad_bind",
+          "named": true
+        },
+        {
           "type": "operator",
           "named": true
         },
@@ -2566,6 +2586,10 @@
         },
         {
           "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "monad_bind",
           "named": true
         },
         {
@@ -3554,6 +3578,10 @@
         },
         {
           "type": "constructor",
+          "named": true
+        },
+        {
+          "type": "single_quoted_name",
           "named": true
         }
       ]
@@ -4844,6 +4872,10 @@
   },
   {
     "type": "module_identifier",
+    "named": true
+  },
+  {
+    "type": "monad_bind",
     "named": true
   },
   {

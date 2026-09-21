@@ -148,3 +148,17 @@ b xs = 'Data.Map'.foldrWithKey` append xs
         argument: (identifier))
       argument: (identifier))))
 
+==================
+Record Pattern with Qualified Type Name
+==================
+p {'M'.T| a} = a
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    pattern: (record_pattern
+      (single_quoted_name)
+      field: (identifier))
+    body: (identifier)))
+

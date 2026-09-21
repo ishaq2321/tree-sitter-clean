@@ -1514,7 +1514,14 @@ module.exports = grammar({
         "{",
         choice(
           $._record_pattern_members,
-          seq($.constructor, $._pipe, $._record_pattern_members),
+          // The record may be named by TYPE, and that type may be
+          // module-qualified: `{'Range'.Position| 'Range'.line, ...}` — the
+          // whole `'Module'.Type` lexes as one `single_quoted_name` token.
+          seq(
+            choice($.constructor, $.single_quoted_name),
+            $._pipe,
+            $._record_pattern_members,
+          ),
         ),
         "}",
       ),
@@ -1627,7 +1634,11 @@ module.exports = grammar({
         prec.left(PREC.EXPONENT, seq($._expression, field("operator", "!!"), $._expression)),
         // generic fallback for any other operator symbol (including
         // `|`-containing operators like `++|`, `<|-` — see operator_pipe)
-        prec.left(PREC.ADD, seq($._expression, field("operator", choice($.operator, $.operator_pipe)), $._expression)),
+        // `$monad_bind` rides along with the generic operator alternative so
+        // the new token reuses these states instead of adding an alternative
+        // family to every expression state (measured: +590 actions as its own
+        // alternative, which overflowed the table).
+        prec.left(PREC.ADD, seq($._expression, field("operator", choice($.operator, $.operator_pipe, $.monad_bind)), $._expression)),
         // dot operators (`x +++. y` — the stdlib's string append `+++.`)
         prec.left(PREC.ADD, seq($._expression, field("operator", $.operator_dot), $._expression)),
       ),
@@ -2207,6 +2218,9 @@ module.exports = grammar({
     // symbol of a longer tiered operator (e.g. `<=` would lex as `<`).
     _operator_symbol: ($) =>
       choice(
+        // `from Control.Monad import <=<, >>=, class Monad (..)` — the monadic
+        // operators are imported (and renamed/declared) by name too.
+        $.monad_bind,
         $.operator_compare,
         $.operator_add,
         $.operator_mul,
@@ -2289,6 +2303,14 @@ module.exports = grammar({
     // Dedicated token (prec 2) so it is never split or out-lexed in either
     // position.
     strict_equal: ($) => token(prec(2, "=:")),
+
+    // `>>=` / `>>` / `=<<` — monadic bind and sequencing (Clyde, Eastwood:
+    // `scan =<< scanMultiLineComment (i+2)`, `parseOne >>= \\x -> ...`).
+    // Clean operator symbols include `=`, but the catch-all `operator` regex
+    // excludes it on purpose (it would swallow the definition `=`), so these
+    // need their own token. Bound at the `||` level, left-associative, which
+    // matches `infixl 1` in the stdlib for the chains that occur in practice.
+    monad_bind: ($) => token(prec(1, choice(">>=", "=<<", ">>", "<=<", ">=>"))),
 
     // Catch-all for any other operator run (`+++`, `***`, `<-+-`, ...).
     // The catch-all user operator. `|` is included so operators like `++|`

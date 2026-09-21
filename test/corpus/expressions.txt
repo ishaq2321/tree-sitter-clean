@@ -249,3 +249,20 @@ g x
         argument: (identifier)))
     (guard_body
       body: (identifier))))
+
+==================
+Monadic Bind Operators
+==================
+f xs = scan =<< g xs
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    pattern: (identifier)
+    body: (binary_expression
+      (identifier)
+      operator: (monad_bind)
+      (application
+        function: (identifier)
+        argument: (identifier)))))
