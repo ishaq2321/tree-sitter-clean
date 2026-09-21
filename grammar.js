@@ -110,9 +110,13 @@ module.exports = grammar({
     // record pattern `{x, y}` vs. record expression `{x = a}` — same `{ name`
     // prefix, disambiguated by what follows (`,`/`}` = pattern, `=` = expr)
     [$.record_pattern, $._expression_atom],
-    // ... and the same fork at the individual record-pattern-member level
-    // (`{ # { id, ... }` — array of records: `id` is a member or an expr)
-    [$._record_pattern_member, $._expression_atom],
+    // A record FIELD name forks the same way: `{ f = v }` (construction),
+    // `{ r & f = v }` (update) and `{ f }` (pattern) share the `{ name`
+    // prefix, where the name may instead begin an expression (the update
+    // base). `_field_name` is the single place the name is now accepted, so
+    // this one declaration covers construction, access, patterns, updates
+    // and record declarations.
+    [$._field_name, $._expression_atom],
     // comprehension generator body is an expression; in `case`/`with`/let the
     // same tokens could start a pattern. Disambiguate expression vs. pattern.
     [$._pattern, $._expression_atom],
@@ -682,7 +686,7 @@ module.exports = grammar({
 
     record_field: ($) =>
       seq(
-        field("name", $.identifier),
+        field("name", $._field_name),
         "::",
         field("type", $._type),
       ),
@@ -1523,7 +1527,7 @@ module.exports = grammar({
 
     _record_pattern_member: ($) =>
       seq(
-        field("field", $.identifier),
+        field("field", $._field_name),
         optional(seq("=", $._pattern)),
       ),
 
@@ -1663,7 +1667,11 @@ module.exports = grammar({
         seq(
           field("record", $._record),
           choice(".", "!"),
-          field("field", $.identifier),
+          // The selector may also be a CONSTRUCTOR: `event.FileEvent.uri`
+          // selects `uri` from `event` as a `FileEvent` (type-qualified field
+          // selection). Without this the parser demands an identifier after
+          // the `.` and inserts a MISSING one (Eastwood's uriPath chain).
+          field("field", choice($._field_name, $.constructor)),
         ),
       ),
 
@@ -1938,12 +1946,21 @@ module.exports = grammar({
     // ---- Records ----
 
     // `{ name = "x", age = 25 }`
+    // A record field name: plain (`range`) or module-qualified
+    // (`'LSP.Diagnostic'.range`). The lexer already produces the whole
+    // `'Module'.field` as ONE `single_quoted_name` token, so a qualified
+    // field needs no `.` handling — only acceptance in name position. Used
+    // by record construction, access, patterns, updates and record
+    // declarations; missing it in any of these derails whole files into
+    // recovery (Eastwood's lspDiagnosticFor).
+    _field_name: ($) => choice($.identifier, $.single_quoted_name),
+
     record_expression: ($) =>
       seq(
         "{",
         repeat1(
           seq(
-            field("name", $.identifier),
+            field("name", $._field_name),
             "=",
             field("value", $._expression),
             optional(","),
@@ -1994,10 +2011,10 @@ module.exports = grammar({
     // mirroring field_access on the expression side).
     update_field: ($) =>
       choice(
-        $.identifier,
+        $._field_name,
         seq("[", $._expression, optional(seq("..", optional($._expression))), "]"),
         seq(
-          $.identifier,
+          $._field_name,
           repeat1(
             choice(
               seq(".", $.identifier),
@@ -2157,6 +2174,11 @@ module.exports = grammar({
     // `'Data.Error'.isError` — a module-qualified name whose module is wrapped
     // in single quotes (Eastwood/Clyde style). ONE token: the lexer picks it
     // over a char literal by longest match; a lone `'M'` stays a char.
+    // The trailing class includes `` ` `` on purpose: Clean allows a trailing
+    // backtick on a name (`'Data.Map'.foldrWithKey`` and `xs``), and the
+    // plain `identifier`/`constructor` regexes already cover it. Without it
+    // here the backtick is left as an unmatched character and the whole
+    // expression derails into recovery (Eastwood's collectDiagnostics).
     single_quoted_name: ($) =>
       token(
         seq(
@@ -2164,7 +2186,7 @@ module.exports = grammar({
           /[A-Za-z0-9_.']+/,
           "'",
           ".",
-          /[A-Za-z0-9_']+/,
+          /[A-Za-z0-9_'`]+/,
         ),
       ),
 

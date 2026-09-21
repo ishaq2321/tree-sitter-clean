@@ -62,6 +62,7 @@ Record Pattern by Type Name
 ==================
 f { WorkspaceFolder | uri } = uri
 ---
+
 (source_file
   (function_declaration
     name: (identifier)
@@ -69,3 +70,81 @@ f { WorkspaceFolder | uri } = uri
       (constructor)
       field: (identifier))
     body: (identifier)))
+
+==================
+Record Construction with Qualified Field Name
+==================
+f r = { 'LSP.Diagnostic'.range = r }
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    pattern: (identifier)
+    body: (record_expression
+      name: (single_quoted_name)
+      value: (identifier))))
+
+==================
+Qualified Field Access
+==================
+g x = x.'Diagnostic'.message
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    pattern: (identifier)
+    body: (field_access
+      record: (identifier)
+      field: (single_quoted_name))))
+
+==================
+Record Update with Qualified Field Name
+==================
+u r = { r & 'LSP.Diagnostic'.range = 1 }
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    pattern: (identifier)
+    body: (record_update
+      record: (identifier)
+      field: (update_field
+        (single_quoted_name))
+      value: (number
+        (integer)))))
+
+==================
+Type-Qualified Field Selection
+==================
+c e = e.FileEvent.uri
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    pattern: (identifier)
+    body: (field_access
+      record: (field_access
+        record: (identifier)
+        field: (constructor))
+      field: (identifier))))
+
+==================
+Qualified Name with Trailing Backtick
+==================
+b xs = 'Data.Map'.foldrWithKey` append xs
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    pattern: (identifier)
+    body: (application
+      function: (application
+        function: (single_quoted_name)
+        argument: (identifier))
+      argument: (identifier))))
+

@@ -1905,7 +1905,7 @@
           "name": "name",
           "content": {
             "type": "SYMBOL",
-            "name": "identifier"
+            "name": "_field_name"
           }
         },
         {
@@ -6020,7 +6020,7 @@
           "name": "field",
           "content": {
             "type": "SYMBOL",
-            "name": "identifier"
+            "name": "_field_name"
           }
         },
         {
@@ -6739,8 +6739,17 @@
             "type": "FIELD",
             "name": "field",
             "content": {
-              "type": "SYMBOL",
-              "name": "identifier"
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "_field_name"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "constructor"
+                }
+              ]
             }
           }
         ]
@@ -8191,6 +8200,19 @@
         }
       ]
     },
+    "_field_name": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "identifier"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "single_quoted_name"
+        }
+      ]
+    },
     "record_expression": {
       "type": "SEQ",
       "members": [
@@ -8208,7 +8230,7 @@
                 "name": "name",
                 "content": {
                   "type": "SYMBOL",
-                  "name": "identifier"
+                  "name": "_field_name"
                 }
               },
               {
@@ -8360,7 +8382,7 @@
       "members": [
         {
           "type": "SYMBOL",
-          "name": "identifier"
+          "name": "_field_name"
         },
         {
           "type": "SEQ",
@@ -8413,7 +8435,7 @@
           "members": [
             {
               "type": "SYMBOL",
-              "name": "identifier"
+              "name": "_field_name"
             },
             {
               "type": "REPEAT1",
@@ -8884,7 +8906,7 @@
           },
           {
             "type": "PATTERN",
-            "value": "[A-Za-z0-9_']+"
+            "value": "[A-Za-z0-9_'`]+"
           }
         ]
       }
@@ -9388,7 +9410,7 @@
       "_expression_atom"
     ],
     [
-      "_record_pattern_member",
+      "_field_name",
       "_expression_atom"
     ],
     [
