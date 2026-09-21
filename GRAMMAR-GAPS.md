@@ -956,10 +956,14 @@ ones that matter to the users who filed the issues:
 
 | file | nodes | error bytes |
 |---|---|---|
-| `eastwood/test/LanguageServerTests.icl` | 89 | 62,593 |
+| `eastwood/test/LanguageServerTests.icl` | 29 (was 89) | 62,593 |
 | `Clyde/cleantools/Pm/PmParse.icl` | 193 | 56,599 |
 | `clean-stdlib/_SystemDynamic.icl` | 21 | 17,663 |
 | `eastwood/test/suite-default/someLib/TestModule.icl` | 3 | 152 |
+
+(`LanguageServerTests.icl`'s node count dropped 89 → 29 from the `=.=` fix
+below while its error bytes did not move at all — the numbers in that row are
+the reason the metric had to change.)
 
 (`tooLarge.icl`, 100,002 bytes in 2 nodes, is a 5-line fixture holding a
 single-line 100 000-element list literal, written to overflow cocl's stack —
@@ -993,6 +997,41 @@ their whole-file structure, error bytes go ×4, and generation slows from
   comment at `type_definition` already describes the intended syntax, so the
   rule is correct in principle and merely not worth the table shift until the
   guard chains are handled.
+
+### Found by the byte metric: `=.=` (Data.GenEq equality) was never lexed
+
+Region-level bisection of the largest wrapped file (parse `head -N` for every
+N, report where problems first appear) put `LanguageServerTests.icl`'s derail
+point at line 318, not at the `where`/`#`-binding shapes the node counts had
+pointed at:
+
+```clean
+= ( name "all expected symbols and kinds are generated" (validSymbolMap symbolMap =.= True) /\
+    name "all expected comments are generated" (commentResults symbolMap =.= expectedCommentResults)
+  , world
+  )
+```
+
+Minimal repro (`f x y = (x =.= y) /\ (g x =.= True)`, and even
+`f = a =.= b`) failed: `=.=` is not in the catch-all `operator` alphabet, which
+only covers `[~%^*+\-\\<>/?$]+`. `=.=` cannot be lexed by that alphabet at all,
+because the run contains a `.` — and `.` must stay its own token for qualified
+names (`Data.List.map`) and field access (`r.f`). So the operator needs a
+spelling of its own; it is now a choice in `operator_compare` (a TOKEN added to
+an existing choice, which is the free direction).
+
+Measured: `LinterTests.icl` **10 → 0** (378 → 0 error bytes), the corpus
+606 nodes / 260,863 bytes, no file worse, and the real Eastwood fragment above
+parses clean with both `=.=` operands and the multi-line `/\` chain. In
+`LanguageServerTests.icl` the *first* derail point moved from line 314 to line
+728 — the file is still wrapped by a *later* construct, which is why its bytes
+are unchanged. Two corpus tests cover the operator (plain conjunction and the
+multi-line `where`-block shape).
+
+The follow-on target is therefore `LanguageServerTests.icl:728–755` (a
+`where`-block function whose `#` binding value spans four lines through `$`
+and a nested `where`, plus a `= ( ExistsIn ... )` body at column 4) — 62,593
+error bytes, 24% of the corpus total, in one wrapper.
 
 ### Consequence for the remaining work
 

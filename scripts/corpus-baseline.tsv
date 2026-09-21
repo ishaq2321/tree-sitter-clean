@@ -3,7 +3,7 @@
 # Problem nodes = ERROR + MISSING; error bytes = source bytes inside them (union of ranges);
 # wrapped = a top-level ERROR node covers >=50% of the file.
 # Regenerate after a verified release so the next gate compares against it.
-# totals: 676 problem nodes, 261241 error bytes, 4 wrapped
+# totals: 606 problem nodes, 260863 error bytes, 4 wrapped
 Clyde/Clyde.icl	0	0	0
 Clyde/Clyde/ClydeApplicationController.dcl	0	0	0
 Clyde/Clyde/ClydeApplicationController.icl	11	10	0
@@ -289,8 +289,8 @@ eastwood/src/sharedUtil/Range.dcl	0	0	0
 eastwood/src/sharedUtil/Range.icl	1	23	0
 eastwood/test/Common.dcl	0	0	0
 eastwood/test/Common.icl	0	0	0
-eastwood/test/LanguageServerTests.icl	89	62593	1
-eastwood/test/LinterTests.icl	10	378	0
+eastwood/test/LanguageServerTests.icl	29	62593	1
+eastwood/test/LinterTests.icl	0	0	0
 eastwood/test/suite-config-empty-paths/ok.icl	0	0	0
 eastwood/test/suite-config-missing-stdenv/GoToModule1.dcl	0	0	0
 eastwood/test/suite-config-missing-stdenv/GoToModule1.icl	0	0	0

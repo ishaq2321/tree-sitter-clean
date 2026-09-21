@@ -2336,7 +2336,20 @@ module.exports = grammar({
     // `x:!xs` — strict cons: forces the evaluation of the tail. Longest-match
     // splits `:` from `:!` at equal precedence (both 0).
     operator_cons_strict: ($) => token(prec(0, ":!")),
-    operator_compare: ($) => token(prec(1, choice("==", "<>", "<", ">", "<=", ">="))),
+    // `=.=` — Clean's generic equality (Data.GenEq). It needs its own
+    // spelling here because the catch-all `operator` regex cannot lex it: the
+    // run contains a `.`, which is not in the operator alphabet (`.` must stay
+    // a separate token for qualified names and field access). Eastwood's own
+    // test suite is the only corpus user (LanguageServerTests.icl 15,
+    // LinterTests.icl 5) and it is where
+    // `(validSymbolMap symbolMap =.= True) /\ ...` derailed: from that line on
+    // LanguageServerTests.icl was one wrapped ERROR. Grouped with the other
+    // comparison operators because that is the level the corpus binds it at
+    // (`A =.= B /\ C`); the corpus does not pin its fixity down further
+    // (Data.GenEq itself is outside it), so this is usage-driven, not a claim
+    // about Clean's own declaration.
+    operator_compare: ($) =>
+      token(prec(1, choice("==", "=.=", "<>", "<", ">", "<=", ">="))),
     // Statement separator. Precedence 1 beats the default 0 of the rules it
     // separates, so a `;` after a member (case alternative, let-before
     // binding, ...) SHIFTS to continue the member list instead of reducing

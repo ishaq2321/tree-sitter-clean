@@ -5,6 +5,20 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`=.=` is lexed (Clean's generic equality, `Data.GenEq`).** It was not in
+  any operator token: the catch-all alphabet is `[~%^*+\-\\<>/?$]+`, and `=.=`
+  contains a `.`, which must stay a separate token for qualified names and
+  field access. Any expression containing it —
+  `(validSymbolMap symbolMap =.= True) /\ ...` — swallowed the following lines
+  as one recovery ERROR. It is now an `operator_compare`, which fixes
+  `eastwood/test/LinterTests.icl` completely (**10 → 0** problems, 378 → 0
+  error bytes) and removes the derail point in
+  `eastwood/test/LanguageServerTests.icl` (89 → 29 problem nodes; its own
+  wrapper now starts at line 728 instead of 314). Corpus: 676 → 606 problem
+  nodes, no file worse in either metric. Two corpus tests added.
+
 ### Changed — the regression gate measures error BYTES and wrapping, not only
 ### problem-node counts
 
@@ -24,13 +38,14 @@ fails on any of them getting worse:
 still loads, with the byte checks reported as skipped instead of silently
 passing.
 
-Baseline under the new metric (nothing in the grammar changed): **676 problem
-nodes, 261,241 error bytes, 4 wrapped files** — `LanguageServerTests.icl`,
-`PmParse.icl`, `_SystemDynamic.icl`, `TestModule.icl`. The metric change also
-re-confirmed the v1.2.5→HEAD fix pass as a real improvement (285,752 → 261,241
-error bytes, no file worse except `Symbol.icl` +81 bytes for −50 nodes). See
-§12 of GRAMMAR-GAPS.md for the measurements, including two fixes that were
-reverted after this metric showed them to be 4× downgrades.
+Baseline under the new metric: **606 problem nodes, 260,863 error bytes, 4
+wrapped files** — `LanguageServerTests.icl`, `PmParse.icl`,
+`_SystemDynamic.icl`, `TestModule.icl`. Before the `=.=` fix below the same
+metric read 676 nodes / 261,241 bytes, and it re-confirmed the v1.2.5→HEAD fix
+pass as a real improvement (285,752 → 261,241 error bytes; no file worse except
+`Symbol.icl` +81 bytes for −50 nodes). See §12 of GRAMMAR-GAPS.md for the
+measurements, including two fixes that were reverted after this metric showed
+them to be 4× downgrades.
 
 ## [v1.2.5] - 2026-08-18
 

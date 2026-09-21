@@ -1,9 +1,9 @@
-
 ==================
 Pipe-Containing Operator
 ==================
 a = x ++| y
 ---
+
 (source_file
   (function_declaration
     name: (identifier)
@@ -17,6 +17,7 @@ Generic Kind Expression
 ==================
 bx = bimap{|*|}
 ---
+
 (source_file
   (function_declaration
     name: (identifier)
@@ -30,6 +31,7 @@ Higher-Kinded Generic Selector
 ==================
 bx = bimap{|(*)->*->*|}
 ---
+
 (source_file
   (function_declaration
     name: (identifier)
@@ -49,6 +51,7 @@ x = [a:b!]
 y = [b!]
 z = [a:b:c!]
 ---
+
 (source_file
   (function_declaration
     name: (identifier)
@@ -72,6 +75,7 @@ Strict Field Access in List Element
 x = [b!x]
 y = [a:b!x]
 ---
+
 (source_file
   (function_declaration
     name: (identifier)
@@ -92,6 +96,7 @@ Strict Field Access
 ==================
 w = r!f
 ---
+
 (source_file
   (function_declaration
     name: (identifier)
@@ -104,6 +109,7 @@ List Range Expression
 ==================
 v = [1..10]
 ---
+
 (source_file
   (function_declaration
     name: (identifier)
@@ -124,6 +130,7 @@ z = arr.[i]
 w = cache![mid].subdir
 v = arr [i]
 ---
+
 (source_file
   (function_declaration
     name: (identifier)
@@ -162,6 +169,7 @@ y = l!!child
 z = [!!]
 w = a + b !! c
 ---
+
 (source_file
   (function_declaration
     name: (identifier)
@@ -201,6 +209,7 @@ g x
 	(b,c) = k a
 	= c
 ---
+
 (source_file
   (function_declaration
     name: (identifier)
@@ -319,3 +328,96 @@ b = [0,2..]
         (number
           (integer))
         (range_operator)))))
+
+==================
+Generic Equality Operator in a Conjunction
+==================
+
+f x y = (x =.= y) /\ (g x =.= True)
+---
+
+(source_file
+  (function_declaration
+    (identifier)
+    (identifier)
+    (identifier)
+    (binary_expression
+      (paren_expression
+        (binary_expression
+          (identifier)
+          (operator_compare)
+          (identifier)))
+      (operator)
+      (paren_expression
+        (binary_expression
+          (application
+            (identifier)
+            (identifier))
+          (operator_compare)
+          (boolean))))))
+
+==================
+Generic Equality in a Multi-line where Block
+==================
+
+generateSymbolMapIsCorrect = accUnsafe test
+where
+	test world
+		# (symbolMap, world) = generateSymbolMap (SYMBOL_MAP_EXAMPLE +++ ".dcl") world
+		= ( name "all expected symbols" (validSymbolMap symbolMap =.= True) /\
+			name "all expected comments" (commentResults symbolMap =.= expectedCommentResults)
+		  , world
+		  )
+---
+
+(source_file
+  (function_declaration
+    (identifier)
+    (application
+      (identifier)
+      (identifier))
+    (where_block
+      (local_binding
+        (function_declaration
+          (identifier)
+          (identifier)
+          (guard_binding
+            (tuple_pattern
+              (identifier)
+              (identifier))
+            (application
+              (application
+                (identifier)
+                (paren_expression
+                  (binary_expression
+                    (constructor)
+                    (operator)
+                    (string))))
+              (identifier)))
+          (guard_body
+            (tuple_expression
+              (binary_expression
+                (application
+                  (application
+                    (identifier)
+                    (string))
+                  (paren_expression
+                    (binary_expression
+                      (application
+                        (identifier)
+                        (identifier))
+                      (operator_compare)
+                      (boolean))))
+                (operator)
+                (application
+                  (application
+                    (identifier)
+                    (string))
+                  (paren_expression
+                    (binary_expression
+                      (application
+                        (identifier)
+                        (identifier))
+                      (operator_compare)
+                      (identifier)))))
+              (identifier))))))))
