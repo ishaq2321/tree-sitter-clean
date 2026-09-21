@@ -690,3 +690,14 @@ f x = case token of
           (guard_body
             (arrow)
             body: (identifier)))))))
+
+==================
+Fixity Declaration for a Function Name
+==================
+infixl 7 mod
+---
+
+(source_file
+  (fixity_declaration
+    precedence: (integer)
+    operator: (identifier)))

@@ -102,6 +102,50 @@ instance Show Int where
           argument: (identifier))))))
 
 ==================
+Array Type Constructor in an Instance Head
+==================
+instance Array {!} a where
+	uselect :: !u:{! e} !Int -> *(!e, !u:{! e})
+---
+
+(source_file
+  (instance_declaration
+    name: (instance_class
+      (constructor))
+    argument: (array_type)
+    argument: (type_variable
+      (identifier))
+    (instance_member
+      (type_signature
+        name: (signature_name
+          (identifier))
+        type: (type_function
+          (type_application
+            (strict_type
+              (unique_var_type
+                (identifier)
+                (array_type
+                  (strict_type
+                    (type_variable
+                      (identifier))))))
+            (strict_type
+              (constructor)))
+          (arrow)
+          (uniqueness_type
+            (uniqueness_star)
+            (tuple_type
+              (strict_type
+                (type_variable
+                  (identifier)))
+              (strict_type
+                (unique_var_type
+                  (identifier)
+                  (array_type
+                    (strict_type
+                      (type_variable
+                        (identifier)))))))))))))
+
+==================
 Special Pragmas (inline first member)
 ==================
 isMember :: a -> Bool | Eq a

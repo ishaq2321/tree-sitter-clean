@@ -792,3 +792,114 @@ actually headroom-blocked:
 
 So the next productive move is isolated-state/context-sensitive designs for
 those two families — not further automaton re-engineering.
+
+---
+
+## 11. Post-audit fix pass (2026-09-21, after 7a42e3a): 1013 → 676
+
+Measured with the same gate (`scripts/corpus_regression.py`, 312 real-world
+files, ERROR+MISSING, cache-free parser built from `src/`), the same metric
+commands (`ACTIONS(N)` max action id, `cc | grep -c overflow`), and
+`npx tree-sitter test` for the 98 corpus tests. Starting point: the checked-in
+v1.2.5 baseline of **1013** problem nodes; **676** after this pass (**−337,
+−33%**), **32 files improved**, **1 file regressed by +1** (see the open item
+at the end). Max action id **64913** (< 65535, 622 spare), **0 overflow
+warnings**, generate warning-free.
+
+### 11a. Qualified name as a constructor-pattern ARGUMENT — FIXED
+
+`constructor_pattern` accepted `single_quoted_name` as its HEAD but
+`_pattern_atom` (the argument position) did not, so
+`('syntax'.PD_Function pos id _ _ {'syntax'.rhs_alts=...} 'syntax'.FK_Caf)`
+derailed the whole definition (BasicValueCAFs 13 → 2, then 0 with 11d).
+Adding `$.single_quoted_name` to `_pattern_atom` **reduced** the max action id
+(65056 → 64879): a new atom in an existing choice can merge states rather than
+add them.
+
+### 11b. `[a..]` / `[a,b..]` — open-ended ranges — FIXED (bracket-scoped)
+
+Clean has infinite enumerations (Cloogle's own syntax reference lists `[i..]`,
+`[i..k]`, `[i,j..]`, `[i,j..k]`; 32 corpus lines use them). `range_expression`
+required both endpoints.
+
+**Dead end (measured):** making the endpoint optional in `range_expression` —
+the general fix — scored **731 → 740** overall and blew up `PmDriver.icl`
+**18 → 56**: a range that may complete right after `..` *anywhere* lets a
+finished expression swallow the following definition. The shipped fix offers a
+dedicated `open_range_expression` rule **only in the list/array element
+position** (`list_expression`), which is the only place Clean allows the form:
+**719 → 676** with **0 regressions** (9 files improved, incl. outlineview-
+controller 5 → 2, PmDriver 18 → 17).
+
+### 11c. Array type CONSTRUCTORS `{!}` / `{#}` / `{32#}` — FIXED
+
+`array_type` required an element type, so the same braces could not stand
+alone as a type argument — which is exactly how every `_SystemArray` and
+`_SystemDynamic` instance head is written (`instance Array {!} a where`,
+`instance Array {#} Int where`, `instance Array {#} {#.a} where`). Each head
+failed with a missing argument and cascaded through the module:
+
+| file | before | after |
+|---|---|---|
+| `clean-stdlib/_SystemArray.dcl` | 27 | **0** |
+| `clean-stdlib/_SystemArray.icl` | 21 | 12 |
+| `Prelude/Data/Array.dcl` | 2 | **0** |
+| `Prelude/Data/Array.icl` | 3 | 1 |
+
+Making the element type `optional` in `array_type` scored **719 → 676**
+(−43, 7 files improved, **0 regressions**).
+
+### 11d. `mod` / `rem` are names, not operator words — FIXED
+
+`operator_mul` included `"mod"`/`"rem"`. Those are prelude **functions**
+(`infixl 7 mod`), so a parameter or argument named `mod` at the end of a
+definition body lexed as the *operator* and swallowed the next line as its
+right operand — `diag severity lines mod` followed by `where` even lexed
+`where` as an identifier. Dropping both strings fixes the pattern
+(BasicValueCAFs 13 → 0; builddb 6 → 2, Cache 11 → 7, PmDirCache 4 → 3) and
+costs nothing in the tables (max action id unchanged). `x mod y` now parses as
+the application it is in Clean's prelude.
+
+Consequence: the fixity *report* form (`infixl 7 mod`) needed an `identifier`
+in its operator slot — Clean declares fixity for functions, not only for
+symbolic operators (previously `infixl 7 div` was broken for the same reason).
+
+### 11e. Measured dead end: closing a layout block mid-line (scanner)
+
+A `case` whose alternatives start on a deeper line but whose block ends at a
+delimiter on the SAME line (`(\port opts -> case (toInt port, port) of ...
+Ok {Options | opts & port=p})`) can only be closed by an inserted MISSING
+layout token, so the scanner's indent stack keeps the level the parser already
+closed. The next line is then measured against a stale level, gets a spurious
+`LAYOUT_END` where the sibling `LAYOUT_SEMICOLON` was needed, and the following
+declaration is swallowed as an application argument.
+
+**Attempted fix (reverted):** emit a real zero-width `LAYOUT_END` and pop the
+level when the parser asks for one at a mid-line position with a closing
+delimiter next. It fixes four minimal probes and **regresses the corpus
+(751 → 767; `CloogleServer.icl` 22 → 35)** — the stale level turned out to be
+load-bearing for the existing corpus (with it popped, the *next* dedented list
+line gets a spurious `LAYOUT_START` instead). A follow-up guard against
+`LAYOUT_START` at a continuation/comma token measured identically (that state
+never requested one). Not re-tried without a corpus-wide layout invariant.
+
+### 11f. Open item: `if c a b.[i]` inside a comprehension (+1 file)
+
+`Clyde/cleantools/Pm/PmPath.icl` is **8 → 9** (one extra node in an
+already-broken region; four of the region's five nodes were there before).
+Minimal repro:
+
+```clean
+p9 = [if (c) a b.[i] \\ i<-[0..n]]
+```
+
+The function form of `if` outranks access (13 > `PREC.ACCESS` 11) so its
+alternative reduces at the `.`, stranding the access (`index_access` is then
+rebuilt with a MISSING record) and `\\` lexes as the generic `operator`
+instead of `comprehension_sep`. Confirmed **pre-existing** (the same probe
+fails at HEAD), and two cheap levers were measured and rejected: a
+`[$.if_expression, $.index_access]` conflict (the generator reports it
+*unnecessary* — no shift is even considered) and `PREC.ACCESS` 11 → 14
+(**byte-identical tables**, so the precedence pair is not what decides it).
+
+---

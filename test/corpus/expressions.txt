@@ -266,3 +266,56 @@ f xs = scan =<< g xs
       (application
         function: (identifier)
         argument: (identifier)))))
+
+==================
+Function Named mod Ending a Definition Body
+==================
+runPass config lines mod = diag severity lines mod
+where
+	severity = 1
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    pattern: (identifier)
+    pattern: (identifier)
+    pattern: (identifier)
+    body: (application
+      function: (application
+        function: (application
+          function: (identifier)
+          argument: (identifier))
+        argument: (identifier))
+      argument: (identifier))
+    (where_block
+      (local_binding
+        (function_declaration
+          name: (identifier)
+          body: (number
+            (integer)))))))
+
+==================
+Open-Ended Ranges
+==================
+a = [0..]
+b = [0,2..]
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    body: (list_expression
+      (open_range_expression
+        (number
+          (integer))
+        (range_operator))))
+  (function_declaration
+    name: (identifier)
+    body: (list_expression
+      (number
+        (integer))
+      (open_range_expression
+        (number
+          (integer))
+        (range_operator)))))

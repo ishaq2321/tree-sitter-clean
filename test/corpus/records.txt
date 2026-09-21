@@ -162,3 +162,27 @@ p {'M'.T| a} = a
       field: (identifier))
     body: (identifier)))
 
+==================
+Qualified Name as a Constructor-Pattern Argument
+==================
+f ('syntax'.PD_Function pos id _ _ {'syntax'.rhs_alts='syntax'.UnGuardedExpr expr} 'syntax'.FK_Caf) = expr
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    pattern: (paren_pattern
+      (constructor_pattern
+        constructor: (single_quoted_name)
+        argument: (identifier)
+        argument: (identifier)
+        argument: (wildcard)
+        argument: (wildcard)
+        argument: (record_pattern
+          field: (single_quoted_name)
+          (constructor_pattern
+            constructor: (single_quoted_name))
+          field: (identifier))
+        argument: (single_quoted_name)))
+    body: (identifier)))
+

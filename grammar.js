@@ -407,8 +407,13 @@ module.exports = grammar({
         seq(
           field("associativity", choice("infix", "infixl", "infixr")),
           field("precedence", optional($.integer)),
-          field("operator", $._operator_symbol),
-          repeat(field("operator", $._operator_symbol)),
+          // The report form also names FUNCTIONS (`infixl 7 mod`, `infixl 6
+          // div`): Clean declares fixity for prelude functions as well as
+          // for symbolic operators, so an identifier is a legal operator
+          // here. Without it a name-fixity declaration derailed the whole
+          // following definition into recovery.
+          field("operator", choice($._operator_symbol, $.identifier)),
+          repeat(field("operator", choice($._operator_symbol, $.identifier))),
           optional(";"),
         ),
       ),
@@ -852,12 +857,19 @@ module.exports = grammar({
     // `{#a}` unboxed array, `{a}` boxed array, and the fixed-size form
     // `{32#.a}` used in `_SystemStrictMaybes` instance heads — the `#`
     // follows the element count, not the opening brace.
+    // The element type is OPTIONAL: the same braces name the array type
+    // CONSTRUCTORS when they stand alone as a type argument, which is how
+    // every `_SystemArray`/`_SystemDynamic` instance head is written
+    // (`instance Array {!} a where`, `instance Array {#} Int where`,
+    // `instance Array {#} {#.a} where`). Requiring an element type made each
+    // of those heads fail with a missing argument and cascade through the
+    // whole module.
     array_type: ($) =>
       seq(
         "{",
         optional(choice("!", "#")),
         optional(seq($.number, "#")),
-        $._type,
+        optional($._type),
         "}",
       ),
 
@@ -1586,6 +1598,12 @@ module.exports = grammar({
         $.unboxed_pattern,
         // `compinfo=:(Pers _)` — strict as-pattern as a constructor argument
         $.strict_binding_pattern,
+        // A module-qualified name as a constructor ARGUMENT (`'syntax'.FK_Caf`
+        // inside `('syntax'.PD_Function ... {'syntax'.rhs_alts=...}
+        // 'syntax'.FK_Caf)`). The head of a constructor_pattern already
+        // accepted `single_quoted_name`; without it here a qualified argument
+        // derailed the whole definition into recovery (BasicValueCAFs).
+        $.single_quoted_name,
       ),
 
     // ─────────────────────────────────────────────────────────────────────
@@ -1902,13 +1920,27 @@ module.exports = grammar({
         optional(choice("!", "!!", "#", "#!", $._pipe)),
         optional(
           seq(
-            $._expression,
-            repeat(seq(optional(choice(",", ":")), $._expression)),
+            // An element may be an OPEN range (`[0..]`, `[0,2..]` — Clean's
+            // lazy enumerations; Cloogle's syntax reference lists `[i..]`,
+            // `[i..k]`, `[i,j..]`, `[i,j..k]`). Offering it here rather than
+            // making every range endpoint optional keeps a range from
+            // completing after `..` OUTSIDE brackets, which derailed
+            // PmDriver (18 → 56 problem nodes).
+            choice($.open_range_expression, $._expression),
+            repeat(seq(optional(choice(",", ":")), choice($.open_range_expression, $._expression))),
           ),
         ),
         optional("!"), // spine-strict marker: `[a:b!]`
         "]",
       ),
+
+    // `[a..]` / `[a,b..]` — an open-ended (infinite) enumeration. Only the
+    // bracket forms exist in Clean, so the rule is offered in the list
+    // element positions (see list_expression) rather than making every range
+    // endpoint optional: a range that may complete right after `..` anywhere
+    // let later definitions be swallowed and derailed PmDriver.
+    open_range_expression: ($) =>
+      prec.right(PREC.RANGE, seq($._expression, $.range_operator)),
 
     // `(a, b, c)`
     tuple_expression: ($) =>
@@ -2286,7 +2318,16 @@ module.exports = grammar({
     // `==` → operator_compare). The `arrow`/`generator_sep` tokens keep higher
     // precedences (10) so `->`/`<-` still beat `-`/`<`.
     operator_exp: ($) => token(prec(1, "^")),
-    operator_mul: ($) => token(prec(1, choice("*", "/", "%", "\\", "mod", "rem"))),
+    // `mod` and `rem` are prelude FUNCTIONS (`infixl 7 mod`) that are used
+    // infix, not reserved operator words like `*`/`/`. As tokens with prec 1
+    // they beat `identifier` wherever both were valid, so a NAME `mod` at the
+    // end of a definition body lexed as the operator and swallowed the next
+    // line as its right operand — `diag severity lines mod` followed by
+    // `where` lexed `where` as an identifier (BasicValueCAFs 13 -> 0, plus
+    // builddb/Cache/PmDirCache). Without the tokens `x mod y` parses as the
+    // application it is in Clean's own prelude (`mod` is an ordinary name),
+    // and the fixity report form accepts the identifier.
+    operator_mul: ($) => token(prec(1, choice("*", "/", "%", "\\"))),
     operator_add: ($) => token(prec(1, choice("+", "-", "<<<", ">>>"))),
     // `:` cons operator. Token precedence 0 (equal to the literal `::`): at
     // `::` the longer literal wins by longest-match, so `::` never splits

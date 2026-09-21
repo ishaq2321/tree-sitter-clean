@@ -604,7 +604,7 @@
     "fields": {},
     "children": {
       "multiple": true,
-      "required": true,
+      "required": false,
       "types": [
         {
           "type": "_type",
@@ -1220,6 +1220,10 @@
             "named": true
           },
           {
+            "type": "single_quoted_name",
+            "named": true
+          },
+          {
             "type": "strict_binding_pattern",
             "named": true
           },
@@ -1763,6 +1767,10 @@
         "multiple": true,
         "required": true,
         "types": [
+          {
+            "type": "identifier",
+            "named": true
+          },
           {
             "type": "monad_bind",
             "named": true
@@ -3058,6 +3066,10 @@
         {
           "type": "_expression",
           "named": true
+        },
+        {
+          "type": "open_range_expression",
+          "named": true
         }
       ]
     }
@@ -3265,6 +3277,25 @@
         },
         {
           "type": "integer",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "open_range_expression",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "_expression",
+          "named": true
+        },
+        {
+          "type": "range_operator",
           "named": true
         }
       ]

@@ -98,3 +98,27 @@ f xs ys = [(x, y) \\ x <- xs & y <- ys]
           pattern: (identifier)
           (generator_sep)
           expression: (identifier))))))
+
+==================
+Open-Ended Range Generator in an Array Comprehension
+==================
+f = {x.[i] \\ i<-[0..]}
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    body: (array_comprehension
+      body: (index_access
+        record: (identifier)
+        (identifier))
+      (comprehension_sep)
+      (comprehension_qualifier
+        (generator
+          pattern: (identifier)
+          (generator_sep)
+          expression: (list_expression
+            (open_range_expression
+              (number
+                (integer))
+              (range_operator))))))))
