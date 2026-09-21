@@ -28,15 +28,37 @@ Options:
   --list-new          Also print corpus files that have no baseline entry
                       (they are reported but do not fail the gate).
 
-The per-file metric is problem nodes = ERROR nodes + MISSING tokens (the
-phantom symbols error recovery inserts). MISSING-only regressions are real
-tree-shape damage that an ERROR-only count silently ignores (a `#`-group's
-END-steal can leave an instance member-list closer as a MISSING `;` with
-zero ERROR nodes), so the gate fails on either kind.
+The per-file metrics are:
+
+  problem nodes = ERROR nodes + MISSING tokens (the phantom symbols error
+                  recovery inserts). MISSING-only regressions are real
+                  tree-shape damage that an ERROR-only count silently ignores
+                  (a `#`-group's END-steal can leave an instance member-list
+                  closer as a MISSING `;` with zero ERROR nodes).
+
+  error bytes   = the number of source BYTES inside ERROR/MISSING nodes (the
+                  union of their ranges).  This is the metric that problem
+                  counts cannot replace: when error recovery gives up it wraps
+                  a whole region — or the whole file — in ONE ERROR node, so a
+                  change that collapses 193 problems into 10 can still be a
+                  massive downgrade (measured: a guard-chain change took
+                  PmParse.icl 193 -> 10 nodes while its error bytes grew).  A
+                  node count of 1 is not "almost clean"; it can be the worst
+                  possible parse.
+
+  wrapped       = 1 when one TOP-LEVEL ERROR covers >=50% of the file, i.e.
+                  the recovery gave up on the file rather than on a region.
+                  Reported separately so a newly-wrapped file fails the gate
+                  even if its byte count happens to be flat, and so a file
+                  whose "only" problem node is the whole file can never read
+                  as clean.
+
+The gate fails if any file gains problem nodes, gains error bytes, or becomes
+wrapped.
 
 Exit codes:
-  0  no file gained problem nodes relative to the baseline
-  1  at least one file gained problem nodes (a regression)
+  0  no file got worse relative to the baseline
+  1  at least one file got worse (a regression)
   2  usage / environment error
 """
 
@@ -110,6 +132,51 @@ def count_problems(root):
     return total
 
 
+def error_coverage(root, nbytes):
+    """Bytes inside ERROR/MISSING nodes, and whether the file is wrapped.
+
+    Returns `(covered, wrapped)`.  See the module docstring for why problem
+    counts alone are not enough: error recovery can swallow a huge region in
+    a single ERROR node, which improves every node count while destroying the
+    tree.  Byte coverage makes that regression visible (and `wrapped` makes
+    the extreme case — one ERROR around the whole file — explicit, since a
+    file whose only problem node IS the whole file must never read as clean).
+    """
+    spans = []
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        if node.type == "ERROR" or node.is_error or node.is_missing:
+            spans.append((node.start_byte, node.end_byte))
+        stack.extend(node.children)
+    spans.sort()
+    covered = 0
+    reach = -1
+    for start, end in spans:
+        if start > reach:
+            covered += end - start
+            reach = end
+        elif end > reach:
+            covered += end - reach
+            reach = end
+    # A top-level ERROR spanning half the file means the recovery gave up on
+    # the FILE, not on a construct: PmParse.icl's "10 problem nodes" is one
+    # ERROR over 1300 of its 1459 lines.  Counting only a sole-child wrapper
+    # would miss that (the same node sits beside recovered siblings), and a
+    # root that IS the ERROR (the worst case: no `source_file` at all) has to
+    # be caught too — a measured bad revision produced exactly that for 3
+    # corpus files while every node count improved.
+    half = 0.5 * nbytes
+    wrapped = 0
+    if root.type == "ERROR" and root.end_byte - root.start_byte >= half:
+        return covered, 1
+    for child in root.children:
+        if child.type == "ERROR" and child.end_byte - child.start_byte >= half:
+            wrapped = 1
+            break
+    return covered, wrapped
+
+
 def iter_corpus(corpus_root):
     for dirpath, _dirnames, filenames in os.walk(corpus_root):
         for name in filenames:
@@ -118,34 +185,52 @@ def iter_corpus(corpus_root):
 
 
 def read_baseline(path):
+    """Read the baseline: `path<TAB>nodes[<TAB>bytes<TAB>wrapped]` per file.
+
+    A two-column (legacy) baseline still loads; the byte/wrap checks are then
+    skipped for every file, which the caller reports as a note rather than
+    silently passing.
+    """
     baseline = {}
-    total = 0
-    with open(path, "r", encoding="utf-8") as fh:
-        for line in fh:
-            line = line.rstrip("\n")
-            if not line or line.startswith("#"):
-                continue
-            rel, _, count = line.partition("\t")
-            try:
-                n = int(count)
-            except ValueError:
-                sys.stderr.write("bad baseline line: %r\n" % line)
-                sys.exit(2)
-            baseline[rel] = n
-            total += n
-    return baseline, total
+    totals = [0, 0, 0]
+    for line in open(path, "r", encoding="utf-8"):
+        line = line.rstrip("\n")
+        if not line or line.startswith("#"):
+            continue
+        fields = line.split("\t")
+        rel = fields[0]
+        try:
+            nodes = int(fields[1])
+            nbytes = int(fields[2]) if len(fields) > 2 else -1
+            wrapped = int(fields[3]) if len(fields) > 3 else -1
+        except (IndexError, ValueError):
+            sys.stderr.write("bad baseline line: %r\n" % line)
+            sys.exit(2)
+        baseline[rel] = (nodes, nbytes, wrapped)
+        totals[0] += nodes
+        if nbytes >= 0:
+            totals[1] += nbytes
+            totals[2] += wrapped
+    return baseline, totals
 
 
 def write_baseline(path, counts):
-    total = sum(counts.values())
+    total_nodes = sum(nodes for nodes, _b, _w in counts.values())
+    total_bytes = sum(nbytes for _n, nbytes, _w in counts.values())
+    total_wrapped = sum(wrapped for _n, _b, wrapped in counts.values())
     with open(path, "w", encoding="utf-8") as fh:
         fh.write("# tree-sitter-clean corpus regression baseline\n")
-        fh.write("# ERROR + MISSING nodes per file, generated with --save-baseline.\n")
+        fh.write("# path<TAB>problem nodes<TAB>error bytes<TAB>wrapped\n")
+        fh.write("# Problem nodes = ERROR + MISSING; error bytes = source bytes "
+                 "inside them (union of ranges);\n")
+        fh.write("# wrapped = a top-level ERROR node covers >=50% of the file.\n")
         fh.write("# Regenerate after a verified release so the next gate "
                  "compares against it.\n")
-        fh.write("# total: %d\n" % total)
+        fh.write("# totals: %d problem nodes, %d error bytes, %d wrapped\n"
+                 % (total_nodes, total_bytes, total_wrapped))
         for rel in sorted(counts):
-            fh.write("%s\t%d\n" % (rel, counts[rel]))
+            nodes, nbytes, wrapped = counts[rel]
+            fh.write("%s\t%d\t%d\t%d\n" % (rel, nodes, nbytes, wrapped))
 
 
 def main(argv):
@@ -179,57 +264,82 @@ def main(argv):
         rel = os.path.relpath(path, corpus_root)
         with open(path, "rb") as fh:
             data = fh.read()
-        counts[rel] = count_problems(parser.parse(data).root_node)
+        root = parser.parse(data).root_node
+        covered, wrapped = error_coverage(root, len(data))
+        counts[rel] = (count_problems(root), covered, wrapped)
 
-    current_total = sum(counts.values())
+    total_nodes = sum(nodes for nodes, _b, _w in counts.values())
+    total_bytes = sum(nbytes for _n, nbytes, _w in counts.values())
+    total_wrapped = sum(wrapped for _n, _b, wrapped in counts.values())
 
     if args.save_baseline:
         write_baseline(args.baseline, counts)
-        print("wrote %d entries (%d ERROR nodes) to %s"
-              % (len(counts), current_total, args.baseline))
+        print("wrote %d entries (%d problem nodes, %d error bytes, %d wrapped) "
+              "to %s" % (len(counts), total_nodes, total_bytes,
+                         total_wrapped, args.baseline))
         return 0
 
-    baseline, baseline_total = read_baseline(args.baseline)
+    baseline, (base_nodes, base_bytes, base_wrapped) = read_baseline(
+        args.baseline)
+    legacy = base_bytes == 0 and base_nodes > 0
 
     regressions = []
     improvements = []
     new_files = []
 
-    for rel, n in counts.items():
+    for rel, (nodes, nbytes, wrapped) in counts.items():
         prev = baseline.get(rel)
         if prev is None:
-            new_files.append((rel, n))
-        elif n > prev:
-            regressions.append((rel, prev, n))
-        elif n < prev:
-            improvements.append((rel, prev, n))
+            new_files.append((rel, nodes, nbytes))
+            continue
+        pnodes, pbytes, pwrapped = prev
+        why = []
+        if nodes > pnodes:
+            why.append("nodes %d -> %d" % (pnodes, nodes))
+        if pbytes >= 0 and nbytes > pbytes:
+            why.append("bytes %d -> %d" % (pbytes, nbytes))
+        if pwrapped >= 0 and wrapped > pwrapped:
+            why.append("newly wrapped")
+        if why:
+            regressions.append((rel, "; ".join(why)))
+        elif nodes < pnodes or (pbytes >= 0 and nbytes < pbytes):
+            what = "%d -> %d nodes" % (pnodes, nodes)
+            if pbytes >= 0:
+                what += ", %d -> %d bytes" % (pbytes, nbytes)
+            improvements.append((rel, what))
 
     print("corpus:   %s" % corpus_root)
     print("files:    %d parsed" % len(counts))
-    print("baseline: %d problem nodes (ERROR+MISSING) (%s)"
-          % (baseline_total, os.path.basename(args.baseline)))
-    print("current:  %d problem nodes (ERROR+MISSING)" % current_total)
-    print("delta:    %+d" % (current_total - baseline_total))
+    print("baseline: %d problem nodes, %d error bytes, %d wrapped (%s)"
+          % (base_nodes, base_bytes, base_wrapped,
+             os.path.basename(args.baseline)))
+    print("current:  %d problem nodes, %d error bytes, %d wrapped"
+          % (total_nodes, total_bytes, total_wrapped))
+    print("delta:    %+d problem nodes, %+d error bytes, %+d wrapped"
+          % (total_nodes - base_nodes, total_bytes - base_bytes,
+             total_wrapped - base_wrapped))
+    if legacy:
+        print("note:     baseline has no byte columns — only node counts "
+              "are checked; re-save it with --save-baseline.")
 
     if new_files:
         print("\n%d file(s) have no baseline entry:" % len(new_files))
         if args.list_new:
-            for rel, n in new_files:
-                print("  %d\t%s" % (n, rel))
+            for rel, nodes, nbytes in new_files:
+                print("  %d nodes, %d bytes\t%s" % (nodes, nbytes, rel))
 
     if improvements:
         print("\n%d file(s) improved:" % len(improvements))
-        for rel, prev, n in improvements:
-            print("  %d -> %d\t%s" % (prev, n, rel))
+        for rel, what in improvements:
+            print("  %s\t%s" % (what, rel))
 
     if regressions:
-        print("\n%d file(s) REGRESSED (more ERROR nodes than baseline):"
-              % len(regressions))
-        for rel, prev, n in regressions:
-            print("  %d -> %d\t%s" % (prev, n, rel))
+        print("\n%d file(s) REGRESSED:" % len(regressions))
+        for rel, why in regressions:
+            print("  %s\t%s" % (why, rel))
         return 1
 
-    print("\nPASS: no file gained ERROR nodes.")
+    print("\nPASS: no file gained problem nodes, error bytes or wrapping.")
     return 0
 
 

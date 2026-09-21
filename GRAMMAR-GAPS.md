@@ -902,4 +902,104 @@ fails at HEAD), and two cheap levers were measured and rejected: a
 *unnecessary* — no shift is even considered) and `PREC.ACCESS` 11 → 14
 (**byte-identical tables**, so the precedence pair is not what decides it).
 
+## 12. The metric itself: problem nodes can LIE (2026-09-21, after b5413c1)
+
+### Problem nodes collapse when recovery gives up on the whole file
+
+Error recovery, when it cannot resynchronise, wraps a region — or the entire
+file — in **one** ERROR node. Node counts then *improve* while the tree
+degrades into garbage:
+
+```
+(ERROR                                <- one problem node...
+  (module_declaration ...)
+  (import_declaration ...)
+  ...                                <- ...around the whole file
+```
+
+Measured, this session: a `guard_head` alternative (a `| cond` whose
+bindings/body are sibling members at the guard's own column) plus per-parameter
+uniqueness in `type_definition` took **PmParse.icl 193 → 10 problem nodes** —
+which reads as a triumph — while `PmParse.icl` stayed *wrapped* (one ERROR over
+lines 107–1426) and the corpus error bytes went **261,241 → 1,030,861**
+(a 4× downgrade: PmDriver +78,036, PmProject +39,165, coloured_line +30,832,
+…). Reverted in full. A node count of `1` is not "almost clean" — for a
+1300-line file it is the worst possible parse.
+
+### The gate now measures three things per file
+
+`scripts/corpus_regression.py` reports and enforces, per file:
+
+- **problem nodes** — ERROR + MISSING (as before);
+- **error bytes** — source bytes inside ERROR/MISSING nodes (union of ranges),
+  which a wrapping ERROR cannot hide;
+- **wrapped** — one *top-level* ERROR covering ≥50% of the file, i.e. recovery
+gave up on the FILE rather than on a construct.
+
+The gate fails on any of the three getting worse. `scripts/corpus-baseline.tsv`
+is now `path<TAB>nodes<TAB>bytes<TAB>wrapped` (a 2-column baseline still loads;
+the byte checks are then reported as skipped rather than silently passing).
+Verified by doctoring one baseline line (PmParse bytes 56599 → 1): the gate
+fails with `bytes 1 -> 56599; newly wrapped` and exit code 1.
+
+### Honest baseline after b5413c1
+
+| metric | value |
+|---|---|
+| problem nodes | 676 |
+| error bytes | 261,241 (17% of 1,460,707 corpus bytes) |
+| error bytes, excluding the 100 KB synthetic fixture `tooLarge.icl` | 161,239 (11%) |
+| wrapped files | **4** |
+
+The four wrapped files are the real remaining work, and they are exactly the
+ones that matter to the users who filed the issues:
+
+| file | nodes | error bytes |
+|---|---|---|
+| `eastwood/test/LanguageServerTests.icl` | 89 | 62,593 |
+| `Clyde/cleantools/Pm/PmParse.icl` | 193 | 56,599 |
+| `clean-stdlib/_SystemDynamic.icl` | 21 | 17,663 |
+| `eastwood/test/suite-default/someLib/TestModule.icl` | 3 | 152 |
+
+(`tooLarge.icl`, 100,002 bytes in 2 nodes, is a 5-line fixture holding a
+single-line 100 000-element list literal, written to overflow cocl's stack —
+not a grammar gap.)
+
+**Re-validated:** the §11 fixes were measured under the *old* node-only metric
+(1013 → 676). Under the byte metric they hold up: `bbcaa9f` → `b5413c1` is
+285,752 → 261,241 error bytes, and every file is equal or better except
+`Symbol.icl` (+81 bytes for −50 nodes — the one file where a node-count
+improvement partly wrapped).
+
+### Re-measured dead ends (byte metric)
+
+- **`guard_head`** — a `| cond` with no body of its own, as a sibling member of
+the block it sits in. It parses the jagged guard chains
+(`| c1 / # a = 1 / | c2 / # b = 2 / = b`, 141 such same-column `|`-after-`#`
+pairs in the corpus) and fixes two minimal probes, but it re-resolves the
+parse table for every guard list: 23 files improve on *nodes* while 67 lose
+their whole-file structure, error bytes go ×4, and generation slows from
+~2m06 to ~2m39. Reverted.
+
+  The narrower `optional(...)` on `guard_equation`'s body (the obvious
+  formulation) does not finish generating in 180 s at all — the same
+  table-explosion class as the §7 rejections.
+
+- **Per-parameter uniqueness in `type_definition`** (`:: * Input *a = …`) —
+  re-attempted with a `_type_parameter` rule, the form §7 already records as
+  rejected. Confirmed again: `PmParse.icl` 193 → 191 nodes and still wrapped,
+  because the file's failure is *not* the type head — its head parses once the
+  rule exists; the file's collapse is the guard chain above. The grammar's own
+  comment at `type_definition` already describes the intended syntax, so the
+  rule is correct in principle and merely not worth the table shift until the
+  guard chains are handled.
+
+### Consequence for the remaining work
+
+Ranking the corpus by *nodes* put `Util.icl`, `PmAbcMagic`, `BasicValueCAFs`
+and a long tail first; ranking by *bytes* puts **four wrapped files** first,
+and they account for 52% of all error bytes. Node counts remain useful for
+tree-shape regressions (MISSING tokens), but a file that is *wrapped* needs the
+region-level diagnosis, not a node count.
+
 ---

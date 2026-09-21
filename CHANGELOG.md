@@ -3,6 +3,35 @@
 All notable changes to `tree-sitter-clean` are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed — the regression gate measures error BYTES and wrapping, not only
+### problem-node counts
+
+A node count can improve while the tree gets worse: when error recovery cannot
+resynchronise it wraps a region — or the whole file — in **one** ERROR node, so
+193 problems become 10 and the file reads as "almost clean" while it is in fact
+unparsed. `scripts/corpus_regression.py` now reports three numbers per file and
+fails on any of them getting worse:
+
+- **problem nodes** (ERROR + MISSING) — unchanged;
+- **error bytes** — source bytes inside ERROR/MISSING nodes (union of ranges);
+- **wrapped** — one top-level ERROR covering ≥50% of the file (including the
+  case where the parse tree's root is an ERROR and no `source_file` exists).
+
+`scripts/corpus-baseline.tsv` is now
+`path<TAB>problem nodes<TAB>error bytes<TAB>wrapped`; a two-column baseline
+still loads, with the byte checks reported as skipped instead of silently
+passing.
+
+Baseline under the new metric (nothing in the grammar changed): **676 problem
+nodes, 261,241 error bytes, 4 wrapped files** — `LanguageServerTests.icl`,
+`PmParse.icl`, `_SystemDynamic.icl`, `TestModule.icl`. The metric change also
+re-confirmed the v1.2.5→HEAD fix pass as a real improvement (285,752 → 261,241
+error bytes, no file worse except `Symbol.icl` +81 bytes for −50 nodes). See
+§12 of GRAMMAR-GAPS.md for the measurements, including two fixes that were
+reverted after this metric showed them to be 4× downgrades.
+
 ## [v1.2.5] - 2026-08-18
 
 Three additive grammar fixes, verified against the 239-file Clean corpus

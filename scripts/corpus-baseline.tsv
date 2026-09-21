@@ -1,316 +1,318 @@
 # tree-sitter-clean corpus regression baseline
-# ERROR + MISSING nodes per file, generated with --save-baseline.
+# path<TAB>problem nodes<TAB>error bytes<TAB>wrapped
+# Problem nodes = ERROR + MISSING; error bytes = source bytes inside them (union of ranges);
+# wrapped = a top-level ERROR node covers >=50% of the file.
 # Regenerate after a verified release so the next gate compares against it.
-# total: 1013
-Clyde/Clyde.icl	0
-Clyde/Clyde/ClydeApplicationController.dcl	0
-Clyde/Clyde/ClydeApplicationController.icl	11
-Clyde/Clyde/Console.dcl	0
-Clyde/Clyde/Console.icl	0
-Clyde/Clyde/DebugClyde.dcl	0
-Clyde/Clyde/DebugClyde.icl	1
-Clyde/Clyde/Link.dcl	0
-Clyde/Clyde/Link.icl	6
-Clyde/Clyde/Process.dcl	0
-Clyde/Clyde/Process.icl	0
-Clyde/Clyde/coloured_line.dcl	0
-Clyde/Clyde/coloured_line.icl	0
-Clyde/Clyde/controls.dcl	0
-Clyde/Clyde/controls.icl	0
-Clyde/Clyde/menus.dcl	0
-Clyde/Clyde/menus.icl	0
-Clyde/Clyde/outlineviewcontroller.dcl	4
-Clyde/Clyde/outlineviewcontroller.icl	5
-Clyde/Clyde/projactions.dcl	0
-Clyde/Clyde/projactions.icl	0
-Clyde/Clyde/projdocument.dcl	0
-Clyde/Clyde/projdocument.icl	31
-Clyde/Clyde/projwindowcontroller.dcl	0
-Clyde/Clyde/projwindowcontroller.icl	0
-Clyde/Clyde/tableviewcontroller.dcl	0
-Clyde/Clyde/tableviewcontroller.icl	1
-Clyde/Clyde/textdocument.dcl	0
-Clyde/Clyde/textdocument.icl	0
-Clyde/Clyde/textviewcontroller.dcl	0
-Clyde/Clyde/textviewcontroller.icl	0
-Clyde/Clyde/textwindowcontroller.dcl	0
-Clyde/Clyde/textwindowcontroller.icl	0
-Clyde/Clyde/timeprofile.dcl	0
-Clyde/Clyde/timeprofile.icl	0
-Clyde/Clyde/windows.dcl	0
-Clyde/Clyde/windows.icl	6
-Clyde/Cocoa/Foundation.dcl	0
-Clyde/Cocoa/Foundation.icl	0
-Clyde/Cocoa/Logging.dcl	0
-Clyde/Cocoa/Logging.icl	0
-Clyde/Cocoa/UserDefaults.dcl	0
-Clyde/Cocoa/UserDefaults.icl	0
-Clyde/Cocoa/dyncall.dcl	0
-Clyde/Cocoa/dyncall.icl	0
-Clyde/Cocoa/layout.dcl	0
-Clyde/Cocoa/layout.icl	0
-Clyde/Cocoa/msg.dcl	0
-Clyde/Cocoa/msg.icl	0
-Clyde/Cocoa/objc.dcl	0
-Clyde/Cocoa/objc.icl	0
-Clyde/Cocoa/tabview.dcl	0
-Clyde/Cocoa/tabview.icl	2
-Clyde/Cocoa/toolbar.dcl	0
-Clyde/Cocoa/toolbar.icl	0
-Clyde/Cocoa/viewcontroller.dcl	0
-Clyde/Cocoa/viewcontroller.icl	0
-Clyde/Cocoa/windowcontroller.dcl	0
-Clyde/Cocoa/windowcontroller.icl	0
-Clyde/cleantools/BatchBuild/IdeState.dcl	0
-Clyde/cleantools/BatchBuild/IdeState.icl	4
-Clyde/cleantools/BatchBuild/PmCallBack.dcl	0
-Clyde/cleantools/BatchBuild/PmCallBack.icl	0
-Clyde/cleantools/BatchBuild/PmDialogues.dcl	0
-Clyde/cleantools/BatchBuild/PmDialogues.icl	0
-Clyde/cleantools/BatchBuild/errwin.dcl	0
-Clyde/cleantools/BatchBuild/errwin.icl	0
-Clyde/cleantools/BatchBuild/messwin.dcl	0
-Clyde/cleantools/BatchBuild/messwin.icl	0
-Clyde/cleantools/BatchBuild/projwin.dcl	0
-Clyde/cleantools/BatchBuild/projwin.icl	0
-Clyde/cleantools/BatchBuild/typeatt.dcl	0
-Clyde/cleantools/BatchBuild/typeatt.icl	0
-Clyde/cleantools/BatchBuild/typewin.dcl	0
-Clyde/cleantools/BatchBuild/typewin.icl	0
-Clyde/cleantools/MacOSX/PmCleanSystem.dcl	0
-Clyde/cleantools/MacOSX/PmCleanSystem.icl	3
-Clyde/cleantools/Pm/PmAbcMagic.dcl	0
-Clyde/cleantools/Pm/PmAbcMagic.icl	20
-Clyde/cleantools/Pm/PmCompilerOptions.dcl	0
-Clyde/cleantools/Pm/PmCompilerOptions.icl	0
-Clyde/cleantools/Pm/PmDirCache.dcl	0
-Clyde/cleantools/Pm/PmDirCache.icl	4
-Clyde/cleantools/Pm/PmDriver.dcl	0
-Clyde/cleantools/Pm/PmDriver.icl	18
-Clyde/cleantools/Pm/PmEnvironment.dcl	0
-Clyde/cleantools/Pm/PmEnvironment.icl	0
-Clyde/cleantools/Pm/PmFileInfo.dcl	0
-Clyde/cleantools/Pm/PmFileInfo.icl	0
-Clyde/cleantools/Pm/PmFiles.dcl	0
-Clyde/cleantools/Pm/PmFiles.icl	2
-Clyde/cleantools/Pm/PmParse.dcl	0
-Clyde/cleantools/Pm/PmParse.icl	193
-Clyde/cleantools/Pm/PmPath.dcl	0
-Clyde/cleantools/Pm/PmPath.icl	8
-Clyde/cleantools/Pm/PmProject.dcl	0
-Clyde/cleantools/Pm/PmProject.icl	23
-Clyde/cleantools/Pm/PmTypes.dcl	0
-Clyde/cleantools/Pm/PmTypes.icl	0
-Clyde/cleantools/Util/StdPathname.dcl	0
-Clyde/cleantools/Util/StdPathname.icl	5
-Clyde/cleantools/Util/UtilDate.dcl	0
-Clyde/cleantools/Util/UtilDate.icl	2
-Clyde/cleantools/Util/UtilOptions.dcl	0
-Clyde/cleantools/Util/UtilOptions.icl	13
-Clyde/cleantools/Util/UtilStrictLists.dcl	0
-Clyde/cleantools/Util/UtilStrictLists.icl	5
-Clyde/cleantools/Util/logfile.dcl	0
-Clyde/cleantools/Util/logfile.icl	0
-Prelude/Control/Applicative.dcl	0
-Prelude/Control/Applicative.icl	0
-Prelude/Control/Monad.dcl	3
-Prelude/Control/Monad.icl	0
-Prelude/Data/Array.dcl	2
-Prelude/Data/Array.icl	3
-Prelude/Data/Bool.dcl	0
-Prelude/Data/Bool.icl	0
-Prelude/Data/Char.dcl	0
-Prelude/Data/Char.icl	0
-Prelude/Data/Enum.dcl	0
-Prelude/Data/Enum.icl	0
-Prelude/Data/Eq.dcl	0
-Prelude/Data/Eq.icl	0
-Prelude/Data/Function.dcl	0
-Prelude/Data/Function.icl	0
-Prelude/Data/Functor.dcl	0
-Prelude/Data/Functor.icl	0
-Prelude/Data/Int.dcl	0
-Prelude/Data/Int.icl	0
-Prelude/Data/List.dcl	0
-Prelude/Data/List.icl	0
-Prelude/Data/Num.dcl	0
-Prelude/Data/Num.icl	0
-Prelude/Data/Option.dcl	0
-Prelude/Data/Option.icl	0
-Prelude/Data/Ord.dcl	0
-Prelude/Data/Ord.icl	0
-Prelude/Data/Semigroup.dcl	0
-Prelude/Data/Semigroup.icl	0
-Prelude/Data/String.dcl	0
-Prelude/Data/String.icl	0
-Prelude/Data/_Enum.dcl	0
-Prelude/Data/_Enum.icl	0
-Prelude/Prelude.dcl	0
-Prelude/Prelude.icl	0
-Prelude/System/IO.dcl	0
-Prelude/System/IO.icl	0
-Prelude/System/Misc.dcl	0
-Prelude/System/Misc.icl	0
-Prelude/Text/Show.dcl	0
-Prelude/Text/Show.icl	0
-clean-stdlib/StdArray.dcl	0
-clean-stdlib/StdArray.icl	0
-clean-stdlib/StdBool.dcl	0
-clean-stdlib/StdBool.icl	0
-clean-stdlib/StdChar.dcl	0
-clean-stdlib/StdChar.icl	0
-clean-stdlib/StdCharList.dcl	0
-clean-stdlib/StdCharList.icl	0
-clean-stdlib/StdClass.dcl	0
-clean-stdlib/StdClass.icl	0
-clean-stdlib/StdDebug.dcl	0
-clean-stdlib/StdDebug.icl	0
-clean-stdlib/StdDynamic.dcl	0
-clean-stdlib/StdDynamic.icl	0
-clean-stdlib/StdEnum.dcl	0
-clean-stdlib/StdEnum.icl	0
-clean-stdlib/StdEnv 64 Changed Files/StdFile.dcl	0
-clean-stdlib/StdEnv 64 Changed Files/StdFile.icl	0
-clean-stdlib/StdEnv 64 Changed Files/StdInt.dcl	0
-clean-stdlib/StdEnv 64 Changed Files/StdReal.dcl	0
-clean-stdlib/StdEnv 64 Changed Files/StdReal.icl	0
-clean-stdlib/StdEnv 64 Changed Files/StdString.dcl	0
-clean-stdlib/StdEnv 64 Changed Files/StdString.icl	0
-clean-stdlib/StdEnv 64 Changed Files/_SystemStrictLists.icl	0
-clean-stdlib/StdEnv 64 Changed Files/_SystemStrictMaybes.icl	0
-clean-stdlib/StdEnv.dcl	0
-clean-stdlib/StdEnv.icl	0
-clean-stdlib/StdFile.dcl	0
-clean-stdlib/StdFile.icl	0
-clean-stdlib/StdFile_solaris.dcl	0
-clean-stdlib/StdFile_solaris.icl	0
-clean-stdlib/StdFunc.dcl	0
-clean-stdlib/StdFunc.icl	0
-clean-stdlib/StdFunctions.dcl	0
-clean-stdlib/StdFunctions.icl	0
-clean-stdlib/StdGeneric.dcl	0
-clean-stdlib/StdGeneric.icl	0
-clean-stdlib/StdInt.dcl	0
-clean-stdlib/StdInt.icl	0
-clean-stdlib/StdList.dcl	0
-clean-stdlib/StdList.icl	0
-clean-stdlib/StdMaybe.dcl	0
-clean-stdlib/StdMaybe.icl	0
-clean-stdlib/StdMisc.dcl	0
-clean-stdlib/StdMisc.icl	0
-clean-stdlib/StdOrdList.dcl	0
-clean-stdlib/StdOrdList.icl	0
-clean-stdlib/StdOverloaded.dcl	0
-clean-stdlib/StdOverloaded.icl	0
-clean-stdlib/StdOverloadedList.dcl	0
-clean-stdlib/StdOverloadedList.icl	0
-clean-stdlib/StdReal.dcl	0
-clean-stdlib/StdReal.icl	0
-clean-stdlib/StdStrictLists.dcl	0
-clean-stdlib/StdStrictLists.icl	0
-clean-stdlib/StdString.dcl	0
-clean-stdlib/StdString.icl	0
-clean-stdlib/StdTuple.dcl	0
-clean-stdlib/StdTuple.icl	0
-clean-stdlib/_SystemArray.dcl	14
-clean-stdlib/_SystemArray.icl	21
-clean-stdlib/_SystemDynamic.dcl	5
-clean-stdlib/_SystemDynamic.icl	23
-clean-stdlib/_SystemEnum.dcl	0
-clean-stdlib/_SystemEnum.icl	0
-clean-stdlib/_SystemEnumStrict.dcl	0
-clean-stdlib/_SystemEnumStrict.icl	0
-clean-stdlib/_SystemStrictLists.dcl	0
-clean-stdlib/_SystemStrictLists.icl	0
-clean-stdlib/_SystemStrictMaybes.dcl	0
-clean-stdlib/_SystemStrictMaybes.icl	0
-clean-stdlib/_library.dcl	0
-clean-stdlib/_startup.dcl	0
-clean-stdlib/_system.dcl	0
-cloogle.org/backend/Builtin/ABC.dcl	0
-cloogle.org/backend/Builtin/ABC.icl	0
-cloogle.org/backend/Builtin/Predef.dcl	0
-cloogle.org/backend/Builtin/Predef.icl	22
-cloogle.org/backend/Builtin/Syntax.dcl	0
-cloogle.org/backend/Builtin/Syntax.icl	0
-cloogle.org/backend/CloogleServer.icl	25
-cloogle.org/backend/Util/Cache.dcl	0
-cloogle.org/backend/Util/Cache.icl	11
-cloogle.org/backend/Util/Memory.dcl	0
-cloogle.org/backend/Util/Memory.icl	0
-cloogle.org/backend/Util/SimpleTCPServer.dcl	0
-cloogle.org/backend/Util/SimpleTCPServer.icl	0
-cloogle.org/backend/builddb.icl	6
-eastwood/src/languageServer/Compiler.dcl	0
-eastwood/src/languageServer/Compiler.icl	26
-eastwood/src/languageServer/Config.dcl	0
-eastwood/src/languageServer/Config.icl	3
-eastwood/src/languageServer/Constants.dcl	0
-eastwood/src/languageServer/Constants.icl	0
-eastwood/src/languageServer/EastwoodCleanLanguageServer.icl	57
-eastwood/src/languageServer/GotoDeclaration.dcl	0
-eastwood/src/languageServer/GotoDeclaration.icl	8
-eastwood/src/languageServer/GotoDefinition.dcl	0
-eastwood/src/languageServer/GotoDefinition.icl	8
-eastwood/src/languageServer/GotoUtil.dcl	0
-eastwood/src/languageServer/GotoUtil.icl	17
-eastwood/src/languageServer/Hover.dcl	1
-eastwood/src/languageServer/Hover.icl	26
-eastwood/src/languageServer/LockFile.dcl	0
-eastwood/src/languageServer/LockFile.icl	10
-eastwood/src/languageServer/SemVer.dcl	0
-eastwood/src/languageServer/SemVer.icl	16
-eastwood/src/languageServer/Symbol.dcl	0
-eastwood/src/languageServer/Symbol.icl	66
-eastwood/src/languageServer/Target.dcl	22
-eastwood/src/languageServer/Target.icl	2
-eastwood/src/languageServer/TextDocumentUtil.dcl	0
-eastwood/src/languageServer/TextDocumentUtil.icl	1
-eastwood/src/languageServer/Util.dcl	0
-eastwood/src/languageServer/Util.icl	59
-eastwood/src/linter/EastwoodLint.icl	4
-eastwood/src/linter/Linter.dcl	0
-eastwood/src/linter/Linter.icl	0
-eastwood/src/linter/Pass/BasicValueCAFs.dcl	3
-eastwood/src/linter/Pass/BasicValueCAFs.icl	16
-eastwood/src/linter/Pass/DocError.dcl	0
-eastwood/src/linter/Pass/DocError.icl	3
-eastwood/src/linter/Pass/TrailingWhitespace.dcl	3
-eastwood/src/linter/Pass/TrailingWhitespace.icl	1
-eastwood/src/linter/Util/Configuration.dcl	0
-eastwood/src/linter/Util/Configuration.icl	0
-eastwood/src/linter/Util/SyntaxTree.dcl	0
-eastwood/src/linter/Util/SyntaxTree.icl	0
-eastwood/src/sharedUtil/Diagnostic.dcl	1
-eastwood/src/sharedUtil/Diagnostic.icl	3
-eastwood/src/sharedUtil/Range.dcl	0
-eastwood/src/sharedUtil/Range.icl	1
-eastwood/test/Common.dcl	0
-eastwood/test/Common.icl	0
-eastwood/test/LanguageServerTests.icl	89
-eastwood/test/LinterTests.icl	10
-eastwood/test/suite-config-empty-paths/ok.icl	0
-eastwood/test/suite-config-missing-stdenv/GoToModule1.dcl	0
-eastwood/test/suite-config-missing-stdenv/GoToModule1.icl	0
-eastwood/test/suite-default/DclErrors.dcl	0
-eastwood/test/suite-default/DclErrors.icl	0
-eastwood/test/suite-default/GoToModule1.dcl	19
-eastwood/test/suite-default/GoToModule1.icl	20
-eastwood/test/suite-default/GoToModule2.dcl	0
-eastwood/test/suite-default/GoToModule2.icl	0
-eastwood/test/suite-default/Linter.icl	0
-eastwood/test/suite-default/LinterAndCompiler.icl	1
-eastwood/test/suite-default/UrlEncodedModuleName`.dcl	0
-eastwood/test/suite-default/UrlEncodedModuleName`.icl	0
-eastwood/test/suite-default/WrongModuleName.icl	0
-eastwood/test/suite-default/errors.icl	0
-eastwood/test/suite-default/errorsInImportedDcl.icl	0
-eastwood/test/suite-default/ok.icl	0
-eastwood/test/suite-default/otherLib/IncorrectModuleHeader.icl	0
-eastwood/test/suite-default/someLib/MainModule.icl	0
-eastwood/test/suite-default/someLib/TestModule.dcl	0
-eastwood/test/suite-default/someLib/TestModule.icl	3
-eastwood/test/suite-default/tooLarge.icl	2
-eastwood/test/suite-without-config/NoEastwoodYml.icl	0
-eastwood/test/symbol-map-example/SymbolMapExample.dcl	10
-eastwood/test/symbol-map-example/SymbolMapExample.icl	0
+# totals: 676 problem nodes, 261241 error bytes, 4 wrapped
+Clyde/Clyde.icl	0	0	0
+Clyde/Clyde/ClydeApplicationController.dcl	0	0	0
+Clyde/Clyde/ClydeApplicationController.icl	11	10	0
+Clyde/Clyde/Console.dcl	0	0	0
+Clyde/Clyde/Console.icl	0	0	0
+Clyde/Clyde/DebugClyde.dcl	0	0	0
+Clyde/Clyde/DebugClyde.icl	1	23	0
+Clyde/Clyde/Link.dcl	0	0	0
+Clyde/Clyde/Link.icl	6	246	0
+Clyde/Clyde/Process.dcl	0	0	0
+Clyde/Clyde/Process.icl	0	0	0
+Clyde/Clyde/coloured_line.dcl	0	0	0
+Clyde/Clyde/coloured_line.icl	0	0	0
+Clyde/Clyde/controls.dcl	0	0	0
+Clyde/Clyde/controls.icl	0	0	0
+Clyde/Clyde/menus.dcl	0	0	0
+Clyde/Clyde/menus.icl	0	0	0
+Clyde/Clyde/outlineviewcontroller.dcl	4	35	0
+Clyde/Clyde/outlineviewcontroller.icl	1	1	0
+Clyde/Clyde/projactions.dcl	0	0	0
+Clyde/Clyde/projactions.icl	0	0	0
+Clyde/Clyde/projdocument.dcl	0	0	0
+Clyde/Clyde/projdocument.icl	30	503	0
+Clyde/Clyde/projwindowcontroller.dcl	0	0	0
+Clyde/Clyde/projwindowcontroller.icl	0	0	0
+Clyde/Clyde/tableviewcontroller.dcl	0	0	0
+Clyde/Clyde/tableviewcontroller.icl	0	0	0
+Clyde/Clyde/textdocument.dcl	0	0	0
+Clyde/Clyde/textdocument.icl	0	0	0
+Clyde/Clyde/textviewcontroller.dcl	0	0	0
+Clyde/Clyde/textviewcontroller.icl	0	0	0
+Clyde/Clyde/textwindowcontroller.dcl	0	0	0
+Clyde/Clyde/textwindowcontroller.icl	0	0	0
+Clyde/Clyde/timeprofile.dcl	0	0	0
+Clyde/Clyde/timeprofile.icl	0	0	0
+Clyde/Clyde/windows.dcl	0	0	0
+Clyde/Clyde/windows.icl	6	116	0
+Clyde/Cocoa/Foundation.dcl	0	0	0
+Clyde/Cocoa/Foundation.icl	0	0	0
+Clyde/Cocoa/Logging.dcl	0	0	0
+Clyde/Cocoa/Logging.icl	0	0	0
+Clyde/Cocoa/UserDefaults.dcl	0	0	0
+Clyde/Cocoa/UserDefaults.icl	0	0	0
+Clyde/Cocoa/dyncall.dcl	0	0	0
+Clyde/Cocoa/dyncall.icl	0	0	0
+Clyde/Cocoa/layout.dcl	0	0	0
+Clyde/Cocoa/layout.icl	0	0	0
+Clyde/Cocoa/msg.dcl	0	0	0
+Clyde/Cocoa/msg.icl	0	0	0
+Clyde/Cocoa/objc.dcl	0	0	0
+Clyde/Cocoa/objc.icl	0	0	0
+Clyde/Cocoa/tabview.dcl	0	0	0
+Clyde/Cocoa/tabview.icl	2	0	0
+Clyde/Cocoa/toolbar.dcl	0	0	0
+Clyde/Cocoa/toolbar.icl	0	0	0
+Clyde/Cocoa/viewcontroller.dcl	0	0	0
+Clyde/Cocoa/viewcontroller.icl	0	0	0
+Clyde/Cocoa/windowcontroller.dcl	0	0	0
+Clyde/Cocoa/windowcontroller.icl	0	0	0
+Clyde/cleantools/BatchBuild/IdeState.dcl	0	0	0
+Clyde/cleantools/BatchBuild/IdeState.icl	4	18	0
+Clyde/cleantools/BatchBuild/PmCallBack.dcl	0	0	0
+Clyde/cleantools/BatchBuild/PmCallBack.icl	0	0	0
+Clyde/cleantools/BatchBuild/PmDialogues.dcl	0	0	0
+Clyde/cleantools/BatchBuild/PmDialogues.icl	0	0	0
+Clyde/cleantools/BatchBuild/errwin.dcl	0	0	0
+Clyde/cleantools/BatchBuild/errwin.icl	0	0	0
+Clyde/cleantools/BatchBuild/messwin.dcl	0	0	0
+Clyde/cleantools/BatchBuild/messwin.icl	0	0	0
+Clyde/cleantools/BatchBuild/projwin.dcl	0	0	0
+Clyde/cleantools/BatchBuild/projwin.icl	0	0	0
+Clyde/cleantools/BatchBuild/typeatt.dcl	0	0	0
+Clyde/cleantools/BatchBuild/typeatt.icl	0	0	0
+Clyde/cleantools/BatchBuild/typewin.dcl	0	0	0
+Clyde/cleantools/BatchBuild/typewin.icl	0	0	0
+Clyde/cleantools/MacOSX/PmCleanSystem.dcl	0	0	0
+Clyde/cleantools/MacOSX/PmCleanSystem.icl	3	97	0
+Clyde/cleantools/Pm/PmAbcMagic.dcl	0	0	0
+Clyde/cleantools/Pm/PmAbcMagic.icl	17	177	0
+Clyde/cleantools/Pm/PmCompilerOptions.dcl	0	0	0
+Clyde/cleantools/Pm/PmCompilerOptions.icl	0	0	0
+Clyde/cleantools/Pm/PmDirCache.dcl	0	0	0
+Clyde/cleantools/Pm/PmDirCache.icl	3	465	0
+Clyde/cleantools/Pm/PmDriver.dcl	0	0	0
+Clyde/cleantools/Pm/PmDriver.icl	17	1138	0
+Clyde/cleantools/Pm/PmEnvironment.dcl	0	0	0
+Clyde/cleantools/Pm/PmEnvironment.icl	0	0	0
+Clyde/cleantools/Pm/PmFileInfo.dcl	0	0	0
+Clyde/cleantools/Pm/PmFileInfo.icl	0	0	0
+Clyde/cleantools/Pm/PmFiles.dcl	0	0	0
+Clyde/cleantools/Pm/PmFiles.icl	0	0	0
+Clyde/cleantools/Pm/PmParse.dcl	0	0	0
+Clyde/cleantools/Pm/PmParse.icl	193	56599	1
+Clyde/cleantools/Pm/PmPath.dcl	0	0	0
+Clyde/cleantools/Pm/PmPath.icl	9	21	0
+Clyde/cleantools/Pm/PmProject.dcl	0	0	0
+Clyde/cleantools/Pm/PmProject.icl	8	395	0
+Clyde/cleantools/Pm/PmTypes.dcl	0	0	0
+Clyde/cleantools/Pm/PmTypes.icl	0	0	0
+Clyde/cleantools/Util/StdPathname.dcl	0	0	0
+Clyde/cleantools/Util/StdPathname.icl	5	9	0
+Clyde/cleantools/Util/UtilDate.dcl	0	0	0
+Clyde/cleantools/Util/UtilDate.icl	2	3	0
+Clyde/cleantools/Util/UtilOptions.dcl	0	0	0
+Clyde/cleantools/Util/UtilOptions.icl	13	29	0
+Clyde/cleantools/Util/UtilStrictLists.dcl	0	0	0
+Clyde/cleantools/Util/UtilStrictLists.icl	5	51	0
+Clyde/cleantools/Util/logfile.dcl	0	0	0
+Clyde/cleantools/Util/logfile.icl	0	0	0
+Prelude/Control/Applicative.dcl	0	0	0
+Prelude/Control/Applicative.icl	0	0	0
+Prelude/Control/Monad.dcl	0	0	0
+Prelude/Control/Monad.icl	0	0	0
+Prelude/Data/Array.dcl	0	0	0
+Prelude/Data/Array.icl	1	0	0
+Prelude/Data/Bool.dcl	0	0	0
+Prelude/Data/Bool.icl	0	0	0
+Prelude/Data/Char.dcl	0	0	0
+Prelude/Data/Char.icl	0	0	0
+Prelude/Data/Enum.dcl	0	0	0
+Prelude/Data/Enum.icl	0	0	0
+Prelude/Data/Eq.dcl	0	0	0
+Prelude/Data/Eq.icl	0	0	0
+Prelude/Data/Function.dcl	0	0	0
+Prelude/Data/Function.icl	0	0	0
+Prelude/Data/Functor.dcl	0	0	0
+Prelude/Data/Functor.icl	0	0	0
+Prelude/Data/Int.dcl	0	0	0
+Prelude/Data/Int.icl	0	0	0
+Prelude/Data/List.dcl	0	0	0
+Prelude/Data/List.icl	0	0	0
+Prelude/Data/Num.dcl	0	0	0
+Prelude/Data/Num.icl	0	0	0
+Prelude/Data/Option.dcl	0	0	0
+Prelude/Data/Option.icl	0	0	0
+Prelude/Data/Ord.dcl	0	0	0
+Prelude/Data/Ord.icl	0	0	0
+Prelude/Data/Semigroup.dcl	0	0	0
+Prelude/Data/Semigroup.icl	0	0	0
+Prelude/Data/String.dcl	0	0	0
+Prelude/Data/String.icl	0	0	0
+Prelude/Data/_Enum.dcl	0	0	0
+Prelude/Data/_Enum.icl	0	0	0
+Prelude/Prelude.dcl	0	0	0
+Prelude/Prelude.icl	0	0	0
+Prelude/System/IO.dcl	0	0	0
+Prelude/System/IO.icl	0	0	0
+Prelude/System/Misc.dcl	0	0	0
+Prelude/System/Misc.icl	0	0	0
+Prelude/Text/Show.dcl	0	0	0
+Prelude/Text/Show.icl	0	0	0
+clean-stdlib/StdArray.dcl	0	0	0
+clean-stdlib/StdArray.icl	0	0	0
+clean-stdlib/StdBool.dcl	0	0	0
+clean-stdlib/StdBool.icl	0	0	0
+clean-stdlib/StdChar.dcl	0	0	0
+clean-stdlib/StdChar.icl	0	0	0
+clean-stdlib/StdCharList.dcl	0	0	0
+clean-stdlib/StdCharList.icl	0	0	0
+clean-stdlib/StdClass.dcl	0	0	0
+clean-stdlib/StdClass.icl	0	0	0
+clean-stdlib/StdDebug.dcl	0	0	0
+clean-stdlib/StdDebug.icl	0	0	0
+clean-stdlib/StdDynamic.dcl	0	0	0
+clean-stdlib/StdDynamic.icl	0	0	0
+clean-stdlib/StdEnum.dcl	0	0	0
+clean-stdlib/StdEnum.icl	0	0	0
+clean-stdlib/StdEnv 64 Changed Files/StdFile.dcl	0	0	0
+clean-stdlib/StdEnv 64 Changed Files/StdFile.icl	0	0	0
+clean-stdlib/StdEnv 64 Changed Files/StdInt.dcl	0	0	0
+clean-stdlib/StdEnv 64 Changed Files/StdReal.dcl	0	0	0
+clean-stdlib/StdEnv 64 Changed Files/StdReal.icl	0	0	0
+clean-stdlib/StdEnv 64 Changed Files/StdString.dcl	0	0	0
+clean-stdlib/StdEnv 64 Changed Files/StdString.icl	0	0	0
+clean-stdlib/StdEnv 64 Changed Files/_SystemStrictLists.icl	0	0	0
+clean-stdlib/StdEnv 64 Changed Files/_SystemStrictMaybes.icl	0	0	0
+clean-stdlib/StdEnv.dcl	0	0	0
+clean-stdlib/StdEnv.icl	0	0	0
+clean-stdlib/StdFile.dcl	0	0	0
+clean-stdlib/StdFile.icl	0	0	0
+clean-stdlib/StdFile_solaris.dcl	0	0	0
+clean-stdlib/StdFile_solaris.icl	0	0	0
+clean-stdlib/StdFunc.dcl	0	0	0
+clean-stdlib/StdFunc.icl	0	0	0
+clean-stdlib/StdFunctions.dcl	0	0	0
+clean-stdlib/StdFunctions.icl	0	0	0
+clean-stdlib/StdGeneric.dcl	0	0	0
+clean-stdlib/StdGeneric.icl	0	0	0
+clean-stdlib/StdInt.dcl	0	0	0
+clean-stdlib/StdInt.icl	0	0	0
+clean-stdlib/StdList.dcl	0	0	0
+clean-stdlib/StdList.icl	0	0	0
+clean-stdlib/StdMaybe.dcl	0	0	0
+clean-stdlib/StdMaybe.icl	0	0	0
+clean-stdlib/StdMisc.dcl	0	0	0
+clean-stdlib/StdMisc.icl	0	0	0
+clean-stdlib/StdOrdList.dcl	0	0	0
+clean-stdlib/StdOrdList.icl	0	0	0
+clean-stdlib/StdOverloaded.dcl	0	0	0
+clean-stdlib/StdOverloaded.icl	0	0	0
+clean-stdlib/StdOverloadedList.dcl	0	0	0
+clean-stdlib/StdOverloadedList.icl	0	0	0
+clean-stdlib/StdReal.dcl	0	0	0
+clean-stdlib/StdReal.icl	0	0	0
+clean-stdlib/StdStrictLists.dcl	0	0	0
+clean-stdlib/StdStrictLists.icl	0	0	0
+clean-stdlib/StdString.dcl	0	0	0
+clean-stdlib/StdString.icl	0	0	0
+clean-stdlib/StdTuple.dcl	0	0	0
+clean-stdlib/StdTuple.icl	0	0	0
+clean-stdlib/_SystemArray.dcl	0	0	0
+clean-stdlib/_SystemArray.icl	12	1231	0
+clean-stdlib/_SystemDynamic.dcl	5	6	0
+clean-stdlib/_SystemDynamic.icl	21	17663	1
+clean-stdlib/_SystemEnum.dcl	0	0	0
+clean-stdlib/_SystemEnum.icl	0	0	0
+clean-stdlib/_SystemEnumStrict.dcl	0	0	0
+clean-stdlib/_SystemEnumStrict.icl	0	0	0
+clean-stdlib/_SystemStrictLists.dcl	0	0	0
+clean-stdlib/_SystemStrictLists.icl	0	0	0
+clean-stdlib/_SystemStrictMaybes.dcl	0	0	0
+clean-stdlib/_SystemStrictMaybes.icl	0	0	0
+clean-stdlib/_library.dcl	0	0	0
+clean-stdlib/_startup.dcl	0	0	0
+clean-stdlib/_system.dcl	0	0	0
+cloogle.org/backend/Builtin/ABC.dcl	0	0	0
+cloogle.org/backend/Builtin/ABC.icl	0	0	0
+cloogle.org/backend/Builtin/Predef.dcl	0	0	0
+cloogle.org/backend/Builtin/Predef.icl	22	123	0
+cloogle.org/backend/Builtin/Syntax.dcl	0	0	0
+cloogle.org/backend/Builtin/Syntax.icl	0	0	0
+cloogle.org/backend/CloogleServer.icl	22	391	0
+cloogle.org/backend/Util/Cache.dcl	0	0	0
+cloogle.org/backend/Util/Cache.icl	7	12	0
+cloogle.org/backend/Util/Memory.dcl	0	0	0
+cloogle.org/backend/Util/Memory.icl	0	0	0
+cloogle.org/backend/Util/SimpleTCPServer.dcl	0	0	0
+cloogle.org/backend/Util/SimpleTCPServer.icl	0	0	0
+cloogle.org/backend/builddb.icl	2	36	0
+eastwood/src/languageServer/Compiler.dcl	0	0	0
+eastwood/src/languageServer/Compiler.icl	25	541	0
+eastwood/src/languageServer/Config.dcl	0	0	0
+eastwood/src/languageServer/Config.icl	3	15	0
+eastwood/src/languageServer/Constants.dcl	0	0	0
+eastwood/src/languageServer/Constants.icl	0	0	0
+eastwood/src/languageServer/EastwoodCleanLanguageServer.icl	0	0	0
+eastwood/src/languageServer/GotoDeclaration.dcl	0	0	0
+eastwood/src/languageServer/GotoDeclaration.icl	0	0	0
+eastwood/src/languageServer/GotoDefinition.dcl	0	0	0
+eastwood/src/languageServer/GotoDefinition.icl	0	0	0
+eastwood/src/languageServer/GotoUtil.dcl	0	0	0
+eastwood/src/languageServer/GotoUtil.icl	5	25	0
+eastwood/src/languageServer/Hover.dcl	1	28	0
+eastwood/src/languageServer/Hover.icl	0	0	0
+eastwood/src/languageServer/LockFile.dcl	0	0	0
+eastwood/src/languageServer/LockFile.icl	10	52	0
+eastwood/src/languageServer/SemVer.dcl	0	0	0
+eastwood/src/languageServer/SemVer.icl	15	519	0
+eastwood/src/languageServer/Symbol.dcl	0	0	0
+eastwood/src/languageServer/Symbol.icl	16	16461	0
+eastwood/src/languageServer/Target.dcl	22	625	0
+eastwood/src/languageServer/Target.icl	2	138	0
+eastwood/src/languageServer/TextDocumentUtil.dcl	0	0	0
+eastwood/src/languageServer/TextDocumentUtil.icl	1	8	0
+eastwood/src/languageServer/Util.dcl	0	0	0
+eastwood/src/languageServer/Util.icl	0	0	0
+eastwood/src/linter/EastwoodLint.icl	0	0	0
+eastwood/src/linter/Linter.dcl	0	0	0
+eastwood/src/linter/Linter.icl	0	0	0
+eastwood/src/linter/Pass/BasicValueCAFs.dcl	3	51	0
+eastwood/src/linter/Pass/BasicValueCAFs.icl	0	0	0
+eastwood/src/linter/Pass/DocError.dcl	0	0	0
+eastwood/src/linter/Pass/DocError.icl	2	20	0
+eastwood/src/linter/Pass/TrailingWhitespace.dcl	3	56	0
+eastwood/src/linter/Pass/TrailingWhitespace.icl	0	0	0
+eastwood/src/linter/Util/Configuration.dcl	0	0	0
+eastwood/src/linter/Util/Configuration.icl	0	0	0
+eastwood/src/linter/Util/SyntaxTree.dcl	0	0	0
+eastwood/src/linter/Util/SyntaxTree.icl	0	0	0
+eastwood/src/sharedUtil/Diagnostic.dcl	1	4	0
+eastwood/src/sharedUtil/Diagnostic.icl	3	3	0
+eastwood/src/sharedUtil/Range.dcl	0	0	0
+eastwood/src/sharedUtil/Range.icl	1	23	0
+eastwood/test/Common.dcl	0	0	0
+eastwood/test/Common.icl	0	0	0
+eastwood/test/LanguageServerTests.icl	89	62593	1
+eastwood/test/LinterTests.icl	10	378	0
+eastwood/test/suite-config-empty-paths/ok.icl	0	0	0
+eastwood/test/suite-config-missing-stdenv/GoToModule1.dcl	0	0	0
+eastwood/test/suite-config-missing-stdenv/GoToModule1.icl	0	0	0
+eastwood/test/suite-default/DclErrors.dcl	0	0	0
+eastwood/test/suite-default/DclErrors.icl	0	0	0
+eastwood/test/suite-default/GoToModule1.dcl	9	62	0
+eastwood/test/suite-default/GoToModule1.icl	7	4	0
+eastwood/test/suite-default/GoToModule2.dcl	0	0	0
+eastwood/test/suite-default/GoToModule2.icl	0	0	0
+eastwood/test/suite-default/Linter.icl	0	0	0
+eastwood/test/suite-default/LinterAndCompiler.icl	1	5	0
+eastwood/test/suite-default/UrlEncodedModuleName`.dcl	0	0	0
+eastwood/test/suite-default/UrlEncodedModuleName`.icl	0	0	0
+eastwood/test/suite-default/WrongModuleName.icl	0	0	0
+eastwood/test/suite-default/errors.icl	0	0	0
+eastwood/test/suite-default/errorsInImportedDcl.icl	0	0	0
+eastwood/test/suite-default/ok.icl	0	0	0
+eastwood/test/suite-default/otherLib/IncorrectModuleHeader.icl	0	0	0
+eastwood/test/suite-default/someLib/MainModule.icl	0	0	0
+eastwood/test/suite-default/someLib/TestModule.dcl	0	0	0
+eastwood/test/suite-default/someLib/TestModule.icl	3	152	1
+eastwood/test/suite-default/tooLarge.icl	2	100002	0
+eastwood/test/suite-without-config/NoEastwoodYml.icl	0	0	0
+eastwood/test/symbol-map-example/SymbolMapExample.dcl	10	78	0
+eastwood/test/symbol-map-example/SymbolMapExample.icl	0	0	0
