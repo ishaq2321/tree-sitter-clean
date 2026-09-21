@@ -1516,8 +1516,22 @@
                     "type": "FIELD",
                     "name": "name",
                     "content": {
-                      "type": "SYMBOL",
-                      "name": "constructor"
+                      "type": "CHOICE",
+                      "members": [
+                        {
+                          "type": "SYMBOL",
+                          "name": "constructor"
+                        },
+                        {
+                          "type": "ALIAS",
+                          "content": {
+                            "type": "SYMBOL",
+                            "name": "underscore_constructor"
+                          },
+                          "named": true,
+                          "value": "constructor"
+                        }
+                      ]
                     }
                   },
                   {
@@ -1577,8 +1591,22 @@
                     "type": "FIELD",
                     "name": "name",
                     "content": {
-                      "type": "SYMBOL",
-                      "name": "constructor"
+                      "type": "CHOICE",
+                      "members": [
+                        {
+                          "type": "SYMBOL",
+                          "name": "constructor"
+                        },
+                        {
+                          "type": "ALIAS",
+                          "content": {
+                            "type": "SYMBOL",
+                            "name": "underscore_constructor"
+                          },
+                          "named": true,
+                          "value": "constructor"
+                        }
+                      ]
                     }
                   },
                   {
@@ -1606,8 +1634,22 @@
                     "type": "FIELD",
                     "name": "name",
                     "content": {
-                      "type": "SYMBOL",
-                      "name": "constructor"
+                      "type": "CHOICE",
+                      "members": [
+                        {
+                          "type": "SYMBOL",
+                          "name": "constructor"
+                        },
+                        {
+                          "type": "ALIAS",
+                          "content": {
+                            "type": "SYMBOL",
+                            "name": "underscore_constructor"
+                          },
+                          "named": true,
+                          "value": "constructor"
+                        }
+                      ]
                     }
                   },
                   {
@@ -1659,8 +1701,22 @@
                     "type": "FIELD",
                     "name": "name",
                     "content": {
-                      "type": "SYMBOL",
-                      "name": "constructor"
+                      "type": "CHOICE",
+                      "members": [
+                        {
+                          "type": "SYMBOL",
+                          "name": "constructor"
+                        },
+                        {
+                          "type": "ALIAS",
+                          "content": {
+                            "type": "SYMBOL",
+                            "name": "underscore_constructor"
+                          },
+                          "named": true,
+                          "value": "constructor"
+                        }
+                      ]
                     }
                   }
                 ]
@@ -1849,8 +1905,22 @@
             "type": "FIELD",
             "name": "name",
             "content": {
-              "type": "SYMBOL",
-              "name": "constructor"
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "constructor"
+                },
+                {
+                  "type": "ALIAS",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "underscore_constructor"
+                  },
+                  "named": true,
+                  "value": "constructor"
+                }
+              ]
             }
           },
           {
@@ -8900,6 +8970,26 @@
     "constructor": {
       "type": "PATTERN",
       "value": "[A-Z][a-zA-Z0-9_'`]*"
+    },
+    "underscore_constructor": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PREC",
+        "value": 1,
+        "content": {
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "STRING",
+              "value": "_"
+            },
+            {
+              "type": "PATTERN",
+              "value": "[A-Z][a-zA-Z0-9_'`]*"
+            }
+          ]
+        }
+      }
     },
     "identifier": {
       "type": "PATTERN",

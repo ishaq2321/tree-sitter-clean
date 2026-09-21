@@ -7,6 +7,32 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **`//` inside a block comment no longer lets a `*/` close it.** Clean's rule
+  is that a `//` inside `/* ... */` starts a *line* comment, so the rest of
+  that line is inert and a `*/` on it closes nothing (stated verbatim in
+  Eastwood's own comment scanner, `src/languageServer/Util.icl`). The external
+  scanner closed the comment at line 1 of Eastwood's
+  `test/suite-default/someLib/TestModule.icl` fixture, making its second line a
+  syntax error. The fixture — a module header wrapped in hostile comments,
+  which its test asserts is *valid* — now parses exactly as intended, with the
+  header's inner `/* */` intact: **3 → 0 problem nodes, 152 → 0 error bytes**,
+  wrapped files 4 → 3. A corpus-wide scan shows this is the only such comment
+  in the corpus (so no other file can change); three corpus tests added.
+
+- **`_`-prefixed type names: `:: _UnificationEnvironment`, `| _TypeFixedVar`.**
+  Clean allows `_`-prefixed *capitalized* names as constructors and type names
+  (`clean-stdlib`'s `_SystemDynamic`, `_SystemStrictLists`,
+  `_SystemStrictMaybes` are built on them). They cannot join the `constructor`
+  token, which is load-bearing for the action-table ceiling, so they are
+  re-typed by a new `underscore_constructor` token and used **only** where
+  Clean requires a constructor — type-definition names and ADT member names —
+  aliased back to `constructor`, so the tree is indistinguishable from
+  ordinary Clean. `clean-stdlib/_SystemDynamic.dcl` goes **5 → 0 problem
+  nodes, 6 → 0 error bytes**. The same token in `constructor_pattern` needs
+  66572 actions (ceiling 65535) and is documented as the remaining
+  `_SystemDynamic.icl` blocker in §13b of GRAMMAR-GAPS.md. Two corpus tests
+  added.
+
 - **Strict list comprehensions: `[! x \\ x <- xs | p x !]`.**
   `list_comprehension` accepted only `[` and the overloaded `[|` marker,
   while `list_expression` accepts `!`/`!!`/`#`/`#!`/`|` after the bracket and
@@ -50,9 +76,11 @@ fails on any of them getting worse:
 still loads, with the byte checks reported as skipped instead of silently
 passing.
 
-Baseline under the new metric: **586 problem nodes, 260,863 error bytes, 4
-wrapped files** — `LanguageServerTests.icl`, `PmParse.icl`,
-`_SystemDynamic.icl`, `TestModule.icl`. Before the two fixes below the same
+Baseline when the metric was introduced: **586 problem nodes, 260,863 error
+bytes, 4 wrapped files** — `LanguageServerTests.icl`, `PmParse.icl`,
+`_SystemDynamic.icl`, `TestModule.icl`. After the two fixes in this section the
+baseline is **577 problem nodes, 260,705 error bytes, 3 wrapped files**
+(`_SystemDynamic.icl` is the one still wrapped). Before the two fixes below the same
 metric read 676 nodes / 261,241 bytes, and it re-confirmed the v1.2.5→HEAD fix
 pass as a real improvement (285,752 → 261,241 error bytes; no file worse except
 `Symbol.icl` +81 bytes for −50 nodes). See §12 of GRAMMAR-GAPS.md for the

@@ -14,7 +14,12 @@
  *      by an indented region of sibling declarations.
  *   2. Nested block comments: Clean comments nest, unlike C. They can only be
  *      balanced correctly in an external scanner, so BLOCK_COMMENT is
- *      externalised here.
+ *      externalised here. Inside a block comment a `//` starts a LINE
+ *      comment, so a closing star-slash on that line does NOT close the
+ *      block comment (Clean: a star-slash after `//` does not close a
+ *      multi-line comment). Eastwood's own comment scanner documents the
+ *      same rule in src/languageServer/Util.icl, and its TestModule.icl
+ *      fixture depends on it.
  *
  * Token order in TokenType MUST match the externals array in grammar.js:
  *     _layout_semicolon, _layout_start, _inline_layout_start, _layout_end,
@@ -193,6 +198,17 @@ static void scan_block_comment_body(TSLexer *lexer, uint32_t *col) {
     if (c == '/') {
       lexer->advance(lexer, false);
       (*col)++;
+      if (lexer->lookahead == '/') {
+        /* `//` inside a block comment: the rest of the line is inert, so a
+         * closing star-slash on this line does NOT close the block comment
+         * (and an opening slash-star does not start a nested one). Clean's
+         * rule: a star-slash after `//` closes nothing. */
+        while (!lexer->eof(lexer) && !is_newline(lexer->lookahead)) {
+          lexer->advance(lexer, false);
+          (*col)++;
+        }
+        continue; /* the newline is handled by the next iteration */
+      }
       if (lexer->lookahead == '*') {
         depth++;
         lexer->advance(lexer, false);

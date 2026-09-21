@@ -1113,3 +1113,89 @@ tree-shape regressions (MISSING tokens), but a file that is *wrapped* needs the
 region-level diagnosis, not a node count.
 
 ---
+
+## 13. `//` inside a block comment, and the `_`-constructor ceiling (2026-09-21, after 1688746)
+
+### 13a. `*/` after `//` does not close a block comment — FIXED
+
+Eastwood's own fixture `test/suite-default/someLib/TestModule.icl` is a module
+header wrapped in deliberately hostile comments:
+
+```clean
+/* This comment // will make it harder */
+ * for the module name resolver */
+
+// module thisIsNotTheModuleHeader
+
+/* to find the module name */ implementation   module /* */ someLib.TestModule
+```
+
+Its test (`LanguageServerTests.icl`, "hierarchical modules are correctly
+compiled") asserts that **both** `TestModule.dcl` and `TestModule.icl` produce
+`noDiagnostics`, i.e. the file compiles; the resolver must still find
+`someLib.TestModule`. The scanner treated the `*/` on line 1 as closing the
+comment, so line 2's `*/` was a syntax error and the file was wrapped
+(3 problem nodes, 152 error bytes).
+
+Clean's actual rule — a `//` inside a block comment starts a **line** comment,
+so the rest of that line is inert and a `*/` on it closes nothing — is stated
+verbatim in the fixture author's own comment scanner,
+`eastwood/src/languageServer/Util.icl`:
+
+```clean
+| s.[i]=='/' 
+    | s.[i+1]=='*' // nested multi-line comments
+        = scanMultiLineComment =<< scanMultiLineComment (i+2)
+    | s.[i+1]=='/' // */ after // does not close a multi-line comment
+        = scanMultiLineComment (skipToEndOfLine (i+2) s)
+```
+
+`scan_block_comment_body` now implements it, so the fixture parses exactly as
+intended (one `block_comment` spanning lines 1–2, the line comment, and an
+`implementation module someLib.TestModule` whose header even carries its own
+inner `/* */`). **3 → 0 problem nodes, 152 → 0 error bytes, wrapped files
+4 → 3.**
+
+Blast radius (measured, not assumed): across all 312 corpus files exactly
+**one** single-line block comment contains a `//`, and it is this fixture, so
+the two readings are indistinguishable everywhere else — which the gate
+confirms: it reports this file as the *only* change.
+
+### 13b. `_`-prefixed constructors: type names are now affordable, patterns are not
+
+`_TypeFixedVar`, `_UnificationEnvironment`, `_Consa`, `_Justi` … are ordinary
+Clean constructor/type names (`_[A-Z]`; `_[a-z]` names such as `_aconcat` and
+`_value` are variables/fields and stay `identifier`). They cannot join the
+`constructor` token — see the intro of this file. `_SystemDynamic.icl` has been
+wrapped since before the byte metric existed, and its first derail point is
+line 11, `:: _UnificationEnvironment` / `:== UnificationEnvironment`.
+
+Measured on 2026-09-21 with tree-sitter **0.26.9** (`tree-sitter generate`,
+ABI 14, which refuses to emit a parser once the action count exceeds 65535):
+
+| formulation | action count | verdict |
+|---|---|---|
+| HEAD (no `_`-support) | 64620 | 915 actions of headroom |
+| + `underscore_constructor` token in `type_definition` **and** `data_constructor` names (alias → `constructor`) | under 65535 | **SHIPPED** |
+| + the same token in `constructor_pattern` | 66572 | over the ceiling |
+| + a `prec.left` `_pattern_atom` alternative (`_Cap` + `repeat(_pattern_atom)`) | 66428 | over the ceiling |
+
+The two shipped sites fix the whole of `_SystemDynamic.dcl` (**5 → 0** problems,
+6 → 0 error bytes) and the `:: _UF :== UF` shape, cost nothing measurable
+(`parser.c` 56,650,832 → 56,640,372 bytes) and regress nothing; the alias makes
+the tree read `name: (constructor)`, so downstream queries cannot tell the
+difference.
+
+The **pattern** site is the expensive one and is what keeps
+`_SystemDynamic.icl` wrapped (`is_valid_type (_TypeFixedVar _)`, line 40):
+either formulation alone needs ~1800–1950 actions, i.e. ~1000 more than the
+load-bearing 915 available. An intermediate attempt that shipped all three
+sites *generated* under the repo's pinned CLI (0.24.7) but **segfaulted** the
+runtime on six corpus files (`StdGeneric.dcl`/`.icl`, `GoToModule1.dcl`,
+`GoToModule2.dcl`, `SymbolMapExample.dcl`/`.icl`) and regressed the
+existential-record shape `:: T = E.a:` with a record body — the 65535 ceiling
+must be treated as hard, whichever CLI is in use.
+
+So the remaining `_`-constructor gap is now a precise headroom problem, not a
+grammar-design problem: **buy ~1000 actions** (§10's "reduce the automaton
+elsewhere" path) and `constructor_pattern` can take the third alternative.

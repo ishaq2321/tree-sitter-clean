@@ -1,0 +1,57 @@
+==================
+Line and Block Comments Around a Definition
+==================
+module m
+
+// a line comment
+/* a block comment */
+f = 1
+---
+(source_file
+  (module_declaration
+    name: (module_name
+      (module_identifier)))
+  (line_comment)
+  (block_comment)
+  (function_declaration
+    name: (identifier)
+    body: (number
+      (integer))))
+
+==================
+Nested Block Comments
+==================
+module m
+
+/* outer /* inner */ still inside */
+f = 1
+---
+(source_file
+  (module_declaration
+    name: (module_name
+      (module_identifier)))
+  (block_comment)
+  (function_declaration
+    name: (identifier)
+    body: (number
+      (integer))))
+
+==================
+Star-Slash After a Line Comment Does Not Close a Block Comment
+==================
+/* This comment // will make it harder */
+ * for the module name resolver */
+
+// module thisIsNotTheModuleHeader
+
+/* to find the module name */ implementation   module /* */ someLib.TestModule
+---
+(source_file
+  (block_comment)
+  (line_comment)
+  (block_comment)
+  (module_declaration
+    (block_comment)
+    name: (module_name
+      (module_identifier)
+      (module_identifier))))

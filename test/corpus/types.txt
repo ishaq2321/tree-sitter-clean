@@ -394,3 +394,50 @@ g{|{!}|} xs ys = eqArray xs ys
         function: (identifier)
         argument: (identifier))
       argument: (identifier))))
+
+==================
+Underscore-Prefixed Constructor in an Algebraic Data Type
+==================
+definition module m
+
+:: T
+	= A !Int
+	| _Hidden !Int
+---
+(source_file
+  (module_declaration
+    name: (module_name
+      (module_identifier)))
+  (type_definition
+    name: (constructor)
+    body: (type_definition_body
+      rhs: (data_constructors
+        (data_constructor
+          name: (constructor)
+          argument: (strict_type
+            (constructor)))
+        (data_constructor
+          name: (constructor)
+          argument: (strict_type
+            (constructor)))))))
+
+==================
+Underscore-Prefixed Type Names (Abstract and Synonym)
+==================
+definition module m
+
+:: _Env
+
+:: _Alias
+	:== Env
+---
+(source_file
+  (module_declaration
+    name: (module_name
+      (module_identifier)))
+  (type_definition
+    name: (constructor))
+  (type_definition
+    name: (constructor)
+    body: (type_definition_body
+      rhs: (constructor))))

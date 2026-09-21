@@ -595,7 +595,8 @@ module.exports = grammar({
           seq(
             "::",
             optional(choice("*", "!")),
-            field("name", $.constructor),
+            field("name", choice($.constructor,
+              alias($.underscore_constructor, $.constructor))),
             repeat1(field("parameter", $.type_variable)),
             field("body", $.type_definition_body),
           ),
@@ -605,7 +606,8 @@ module.exports = grammar({
           seq(
             "::",
             optional(choice("*", "!")),
-            field("name", $.constructor),
+            field("name", choice($.constructor,
+              alias($.underscore_constructor, $.constructor))),
             field("body", $.type_definition_body),
           ),
         ),
@@ -618,7 +620,8 @@ module.exports = grammar({
         prec.left(-1,
           seq(
             "::",
-            field("name", $.constructor),
+            field("name", choice($.constructor,
+              alias($.underscore_constructor, $.constructor))),
             repeat1(field("parameter", $.type_variable)),
           ),
         ),
@@ -627,7 +630,8 @@ module.exports = grammar({
           seq(
             "::",
             optional(choice("*", "!")),
-            field("name", $.constructor),
+            field("name", choice($.constructor,
+              alias($.underscore_constructor, $.constructor))),
           ),
         ),
         ),
@@ -674,7 +678,8 @@ module.exports = grammar({
     data_constructor: ($) =>
       prec.right(
         seq(
-          field("name", $.constructor),
+          field("name", choice($.constructor,
+            alias($.underscore_constructor, $.constructor))),
           repeat(field("argument", $._type_atom)),
         ),
       ),
@@ -2194,10 +2199,30 @@ module.exports = grammar({
     // Declared before `identifier` so the more-specific rule wins. Trailing
     // backticks are allowed in Clean identifiers (`xs``, like Haskell primes).
     // NOTE: `_`-prefixed constructors (`_TypeFixedVar`) are NOT matched here —
-    // adding `_[A-Z]` pushes the generated action table past 65536 entries
-    // (silent table corruption; see GRAMMAR-GAPS.md). They lex as identifiers,
-    // which is the pre-existing accepted behaviour.
+    // adding `_[A-Z]` makes every state in which a constructor is valid also
+    // accept these names, and the resulting automaton pushes the action table
+    // past its 65535-entry ceiling (see GRAMMAR-GAPS.md). They lex as
+    // `identifier`; they are re-typed as constructors only where Clean
+    // requires one, via the `underscore_constructor` token below.
     constructor: ($) => /[A-Z][a-zA-Z0-9_'`]*/,
+
+    // `_TypeFixedVar`, `_UnificationEnvironment` — Clean allows `_`-prefixed
+    // CAPITALIZED names as constructors and type names (clean-stdlib's
+    // `_SystemDynamic`, `_SystemStrictLists` and `_SystemStrictMaybes` are
+    // built on them; `_[a-z]` names like `_aconcat`/`_value` stay variables
+    // and fields). Because they cannot join the `constructor` token (see the
+    // note above), this token is listed ONLY in the positions where Clean
+    // requires a constructor — type-definition names and ADT member names —
+    // where it is `alias`ed to `constructor`, so the tree is indistinguishable
+    // from ordinary Clean.
+    //
+    // MEASURED COST, 2026-09-21 (tree-sitter 0.26.9, ABI 14): the same change
+    // applied to `constructor_pattern` instead costs 66572 actions and to
+    // `_pattern_atom` 66428 — both above the 65535 ceiling, so constructor
+    // PATTERNS (`is_valid_type (_TypeFixedVar _)` in _SystemDynamic.icl) are
+    // still unparseable; see GRAMMAR-GAPS.md.
+    underscore_constructor: ($) =>
+      token(prec(1, seq("_", /[A-Z][a-zA-Z0-9_'`]*/))),
 
     identifier: ($) => /[a-z_][a-zA-Z0-9_'`]*/,
 
