@@ -122,3 +122,51 @@ f = {x.[i] \\ i<-[0..]}
               (number
                 (integer))
               (range_operator))))))))
+
+==================
+Strict List Comprehension
+==================
+
+locations = [! fAndLn \\ fAndLn <- ls | isJust fAndLn !]
+---
+
+(source_file
+  (function_declaration
+    (identifier)
+    (list_comprehension
+      (identifier)
+      (comprehension_sep)
+      (comprehension_qualifier
+        (generator
+          (identifier)
+          (generator_sep)
+          (identifier)))
+      (comprehension_qualifier
+        (guard
+          (application
+            (identifier)
+            (identifier)))))))
+
+==================
+Strict List Comprehension with a Plain Close
+==================
+
+locations = [! v \\ v <- ls | isJust v]
+---
+
+(source_file
+  (function_declaration
+    (identifier)
+    (list_comprehension
+      (identifier)
+      (comprehension_sep)
+      (comprehension_qualifier
+        (generator
+          (identifier)
+          (generator_sep)
+          (identifier)))
+      (comprehension_qualifier
+        (guard
+          (application
+            (identifier)
+            (identifier)))))))

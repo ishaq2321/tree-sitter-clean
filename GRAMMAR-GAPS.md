@@ -926,6 +926,11 @@ lines 107–1426) and the corpus error bytes went **261,241 → 1,030,861**
 …). Reverted in full. A node count of `1` is not "almost clean" — for a
 1300-line file it is the worst possible parse.
 
+The same discipline applies to every fix below: a change that shrinks a
+problem count while growing error bytes is a downgrade, and both
+formulations rejected in this section claimed a smaller number for the file
+they targeted.
+
 ### The gate now measures three things per file
 
 `scripts/corpus_regression.py` reports and enforces, per file:
@@ -956,14 +961,15 @@ ones that matter to the users who filed the issues:
 
 | file | nodes | error bytes |
 |---|---|---|
-| `eastwood/test/LanguageServerTests.icl` | 29 (was 89) | 62,593 |
+| `eastwood/test/LanguageServerTests.icl` | 9 (was 89) | 62,593 |
 | `Clyde/cleantools/Pm/PmParse.icl` | 193 | 56,599 |
 | `clean-stdlib/_SystemDynamic.icl` | 21 | 17,663 |
 | `eastwood/test/suite-default/someLib/TestModule.icl` | 3 | 152 |
 
-(`LanguageServerTests.icl`'s node count dropped 89 → 29 from the `=.=` fix
-below while its error bytes did not move at all — the numbers in that row are
-the reason the metric had to change.)
+(`LanguageServerTests.icl`'s node count dropped 89 → 29 → 9 from the `=.=` and
+strict-comprehension fixes below while its error bytes did not move at all —
+the numbers in that row are the reason the metric had to change. Its wrapper
+is now caused by exactly ONE construct, at line 1217.)
 
 (`tooLarge.icl`, 100,002 bytes in 2 nodes, is a 5-line fixture holding a
 single-line 100 000-element list literal, written to overflow cocl's stack —
@@ -1032,6 +1038,71 @@ The follow-on target is therefore `LanguageServerTests.icl:728–755` (a
 `where`-block function whose `#` binding value spans four lines through `$`
 and a nested `where`, plus a `= ( ExistsIn ... )` body at column 4) — 62,593
 error bytes, 24% of the corpus total, in one wrapper.
+
+### From the byte metric: strict list comprehensions were MISparsed
+
+Continuing the same region bisection past the `=.=` fix put
+`LanguageServerTests.icl`'s next derail point at line 768:
+
+```clean
+# locations = [! fAndLn \\ fAndLn <- Map fileAndLineToLocation filesAndLineNumbers | isJust fAndLn !]
+```
+
+`list_comprehension` accepted only `[` + `optional($._pipe)` + body, while
+`list_expression` accepts `!`, `!!`, `#`, `#!` and `|` after the bracket and
+`array_comprehension` already accepted `!`/`#`. So a strict list
+comprehension was never a comprehension: `[! fAndLn \\ fAndLn <- ls]` was
+parsed as a **two-element list** whose first element was the unary expression
+`!fAndLn` with a generic `\\` operator (element separators are optional, so
+nothing rejected it — a silent wrong tree, worse than an error), and the
+moment the comprehension GUARD `|` appeared the parse collapsed.
+
+The rule now takes the same leading markers as `list_expression` plus the
+spine-strict `!` close. Minimal repros (`[! x \\ v <- ls | isJust v !]`,
+`[! x \\ v <- ls | isJust v]`) parse as `list_comprehension` with a generator
+and a guard; `LinterTests.icl` was already clean and the corpus moves
+606 → 586 problem nodes with no file worse. Two corpus tests added.
+
+### Open item: let-before bindings inside a lambda (`\w` / `# …` / `-> …`)
+
+`LanguageServerTests.icl`'s remaining wrapper is now this ONE construct
+(lines 1215–1225):
+
+```clean
+goToDeclarationOfStdEnvFuncWhenLibraryIsPartOfConfig =:
+	accUnsafe \w
+	# (currentDirectory, w) = appFst fromOk $ getCurrentDirectory w
+	->	(goToTestAbsolutePaths Declaration SUITE_DEFAULT … , w)
+```
+
+Minimal repro (fails, 1 problem node):
+
+```clean
+module m
+
+f = \w
+	# y = w
+	-> y
+```
+
+whereas `f = \w` / `\t-> y` and `f = \w -> y` both parse — so the gap is
+specifically let-before bindings between a lambda's parameters and its
+body, and the corpus contains it exactly once (the only one of the file's 80
+`=:` blocks with a `#` or `->` line in it).
+
+**Two formulations measured and rejected** (both reverted):
+
+| shape | parser.c | generate | languageServerTests | corpus |
+|---|---|---|---|---|
+| baseline | 56.6 MB | 1m15 | 9 | 586 nodes |
+| layout block (`_layout_start` + bindings + `optional(_layout_end)`) | 62.2 MB | 3m14 | 54 (whole file wrapped) | regressions |
+| token-only (`repeat` of `guard_binding`, no layout tokens) | 60.6 MB | 4m07 | **588** | regressions |
+
+The layout form makes the scanner push a level at a place where nothing had
+gone before (the `#` line's column equals the body's first line), and the
+token-only form re-resolves lambdas — the most common construct in the
+language — so both lose far more than the one file they fix. `no file worse`
+is the test that kills them, not the file count they claim.
 
 ### Consequence for the remaining work
 

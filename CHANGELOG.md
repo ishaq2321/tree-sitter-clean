@@ -7,6 +7,18 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Strict list comprehensions: `[! x \\ x <- xs | p x !]`.**
+  `list_comprehension` accepted only `[` and the overloaded `[|` marker,
+  while `list_expression` accepts `!`/`!!`/`#`/`#!`/`|` after the bracket and
+  `array_comprehension` already accepted `!`/`#`. The result was not an
+  error but a **silent misparse**: `[! fAndLn \\ fAndLn <- ls]` became a
+  two-element list whose first element was the unary expression `!fAndLn`
+  (element separators are optional, so nothing rejected it), and adding the
+  comprehension guard `|` collapsed the parse — Eastwood's
+  `LanguageServerTests.icl` wrapped 1783 lines in one ERROR from line 768.
+  The rule now takes the same leading markers plus the spine-strict `!`
+  close. Corpus 606 → 586 problem nodes, no file worse; two corpus tests.
+
 - **`=.=` is lexed (Clean's generic equality, `Data.GenEq`).** It was not in
   any operator token: the catch-all alphabet is `[~%^*+\-\\<>/?$]+`, and `=.=`
   contains a `.`, which must stay a separate token for qualified names and
@@ -38,14 +50,14 @@ fails on any of them getting worse:
 still loads, with the byte checks reported as skipped instead of silently
 passing.
 
-Baseline under the new metric: **606 problem nodes, 260,863 error bytes, 4
+Baseline under the new metric: **586 problem nodes, 260,863 error bytes, 4
 wrapped files** — `LanguageServerTests.icl`, `PmParse.icl`,
-`_SystemDynamic.icl`, `TestModule.icl`. Before the `=.=` fix below the same
+`_SystemDynamic.icl`, `TestModule.icl`. Before the two fixes below the same
 metric read 676 nodes / 261,241 bytes, and it re-confirmed the v1.2.5→HEAD fix
 pass as a real improvement (285,752 → 261,241 error bytes; no file worse except
 `Symbol.icl` +81 bytes for −50 nodes). See §12 of GRAMMAR-GAPS.md for the
-measurements, including two fixes that were reverted after this metric showed
-them to be 4× downgrades.
+measurements, including four formulations that were reverted after this metric
+showed them to be downgrades.
 
 ## [v1.2.5] - 2026-08-18
 

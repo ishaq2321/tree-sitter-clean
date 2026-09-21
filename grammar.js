@@ -1975,13 +1975,26 @@ module.exports = grammar({
     // `[x \\ x <- xs]`
     // `[x \\ x <- xs & y <- ys]` — `&` separates parallel (zipped) generators
     // `[| (x,y,z) \\ ((x,y),z) <- xs]` — overloaded-list comprehension
+    // `[! x \\ x <- xs | p x !]` — STRICT list comprehension
+    //
+    // The leading markers are the same set `list_expression` accepts (and
+    // `array_comprehension` already had): `!`/`!!` strict, `#`/`#!` unboxed,
+    // `|` overloaded. Omitting them here did not merely error, it MISparsed:
+    // `[! fAndLn \\ fAndLn <- ls]` became a two-element list whose first
+    // element was the unary expression `!fAndLn` with a generic `\\`
+    // operator (element separators are optional, so nothing rejected it), and
+    // once the comprehension GUARD `|` was reached the parse collapsed —
+    // Eastwood's LanguageServerTests.icl wrapped 1783 lines in one ERROR from
+    // `[! fAndLn \\ ... | isJust fAndLn !]` (line 768). The trailing `!` is
+    // the spine-strict close, which `list_expression` already accepted.
     list_comprehension: ($) =>
       seq(
         "[",
-        optional($._pipe),
+        optional(choice("!", "!!", "#", "#!", $._pipe)),
         field("body", $._expression),
         $.comprehension_sep,
         repeat1(seq($.comprehension_qualifier, optional(choice(",", "&", $._pipe)))),
+        optional("!"), // spine-strict close: `[! ... !]`
         "]",
       ),
 
