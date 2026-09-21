@@ -750,12 +750,24 @@ module.exports = grammar({
     // higher-kinded `{|(*)->*->*|}`): atoms (`*` = the product/tuple
     // constructor lexed as operator_mul, a type variable, a constructor, or a
     // parenthesised operator like `(*)`) separated by `->` arrows.
+    // A generic-kind atom: `*` (the product/tuple constructor), a type
+    // variable, a constructor, a parenthesised operator, or the record kinds
+    // `{}` / `{!}` (`{|{}|} f xs ys = ...`, `{|{!}|} f xs ys = ...` — a
+    // generic specialised over every record type, GoToModule1). Shared by the
+    // kind selector on a definition head and by `generic_kind_type`.
+    _generic_kind_atom: ($) =>
+      choice(
+        $.type_variable,
+        $.constructor,
+        $.parenthesized_operator,
+        $.operator_mul,
+        seq("{", optional("!"), "}"),
+      ),
+
     _generic_kind: ($) =>
       seq(
-        choice($.type_variable, $.constructor, $.operator_mul, $.parenthesized_operator),
-        repeat(
-          seq($.arrow, choice($.type_variable, $.constructor, $.operator_mul, $.parenthesized_operator)),
-        ),
+        $._generic_kind_atom,
+        repeat(seq($.arrow, $._generic_kind_atom)),
       ),
 
     // `{|*|}` — the generic kind applied to a class in a context head
@@ -803,7 +815,16 @@ module.exports = grammar({
         "]",
       ),
 
-    tuple_type: ($) => seq("(", $._type, ",", $._type, repeat(seq(",", $._type)), ")"),
+    // `(a, b, ...)` — a tuple type. The second branch is the bare
+    // tuple-constructor form with no component types (`(,)`, `(,,)`, ...),
+    // which Clean uses as an ordinary type atom when deriving instances over
+    // every tuple arity:
+    //   derive gEqTest [], [!], [!!], [#], (), (,), (,,), (,,,), (,,,,), ...
+    tuple_type: ($) =>
+      choice(
+        seq("(", $._type, ",", $._type, repeat(seq(",", $._type)), ")"),
+        seq("(", repeat1(","), ")"),
+      ),
 
     // `*World` — uniqueness attribute on a type atom. The star is a
     // dedicated high-precedence token: the generic `operator` catch-all (and
@@ -1030,7 +1051,7 @@ module.exports = grammar({
             $._pipe,
             // The kind is a type constructor or variable: `c`, `PAIR`, `(->)`,
             // or `*` (the product/tuple constructor, lexed as operator_mul).
-            field("kind", choice($.type_variable, $.constructor, $.parenthesized_operator, $.operator_mul)),
+            field("kind", $._generic_kind_atom),
             $._pipe,
             "}",
           ),

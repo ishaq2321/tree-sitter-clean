@@ -318,3 +318,35 @@ from Text.GenJSON import generic JSONEncode, generic JSONDecode, :: JSONNode
     (constructor)
     (constructor)
     (constructor)))
+
+==================
+Bare Tuple-Constructor Types in a Derive Declaration
+==================
+derive gEqTest [], [!], (), (,), (,,)
+---
+
+(source_file
+  (derive_declaration
+    name: (identifier)
+    (list_type)
+    (list_type)
+    (unit_type)
+    (tuple_type)
+    (tuple_type)))
+
+==================
+Generic Case Definition with a Record Kind
+==================
+g{|{!}|} xs ys = eqArray xs ys
+---
+
+(source_file
+  (generic_case_definition
+    name: (identifier)
+    pattern: (identifier)
+    pattern: (identifier)
+    body: (application
+      function: (application
+        function: (identifier)
+        argument: (identifier))
+      argument: (identifier))))
