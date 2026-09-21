@@ -103,8 +103,6 @@ module.exports = grammar({
   conflicts: ($) => [
     // type_application vs. end-of-type (followed by context `|` or `=`)
     [$._type, $.type_application],
-    // a data constructor `Just a` vs. a type atom (when RHS could be a synonym)
-    [$.data_constructor, $._type_atom],
     // strict attribute vs. array element-type attribute (`{!Int}`)
     [$._type, $.strict_type],
     // constructor_pattern `Just a` vs. constructor as expression atom
@@ -123,11 +121,6 @@ module.exports = grammar({
     // `(op) pat` — a parenthesized operator can head a macro OR a generic
     // case definition; the `=>` body-separator state split surfaces it.
     [$.macro_definition, $.operator_definition],
-    // record-update pattern `ds & f` vs. a bare identifier pattern
-    [$._pattern, $.record_update_pattern],
-    // a let-before block's `= expr` member vs. ending the function body there
-    [$.function_declaration, $.guard_body],
-    [$.operator_definition, $.guard_body],
     // `#`-group continuation members: at the separator after a member, the
     // recursion's ε-alternative (end the group) conflicts with the shift
     // (continue with the next member). GLR keeps both; the error-free
@@ -137,7 +130,6 @@ module.exports = grammar({
     // (the `;` is the next member's separator) vs. end the declaration (the
     // `;` is a stray statement terminator). GLR keeps both; the error-free
     // continuation wins. NOT resolved by precedence — see function_declaration.
-    [$.function_declaration],
     [$.operator_definition],
     // compound expression as application atom vs as a full expression
     // (e.g. a lambda used as a guard body: `| cond \x -> x = ...`)
@@ -165,10 +157,6 @@ module.exports = grammar({
     [$.with_block],
     // case alternatives: continue with another alternative vs. end the case
     [$.case_expression],
-    // `;` after an alternative: continue the list vs. end the case (the `;`
-    // belongs to the enclosing statement) — shift into a new alternative vs.
-    // reduce the case
-    [$.case_expression, $.case_alternative],
     // special members: continue with another member vs. end the block
     [$.special_block],
     [$.macro_definition, $.function_declaration, $.let_qualifier],
@@ -184,9 +172,6 @@ module.exports = grammar({
     // `infix N op ;` — the `;` may close the fixity declaration or act as the
     // next declaration's separator; both consume it, shape differs only
     [$.fixity_declaration],
-    // `FModified :: ... -> ...;` — the `;` may close the type signature or
-    // act as the enclosing block's member separator; both consume it
-    [$.type_signature],
     // empty list [] in pattern vs expression context
     [$.list_pattern, $.list_expression],
     // a list element followed by `!`: the `!` starts a strict field access on
@@ -574,9 +559,6 @@ module.exports = grammar({
     // The head of a class-context assertion is a class name (constructor or
     // lowercase identifier, e.g. `zero`) or an operator — bare (`| == a`,
     // `| + , - , zero a`) or parenthesised.
-    _context_head: ($) =>
-      choice($.constructor, $.identifier, $._operator_symbol, $.parenthesized_operator, $.parenthesized_name),
-
     // ---- Type definitions (RHS of `::`) ----
     //
     // In Clean, *type names* are uppercase (Maybe, Tree, List), as are *data

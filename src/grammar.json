@@ -1457,31 +1457,6 @@
         ]
       }
     },
-    "_context_head": {
-      "type": "CHOICE",
-      "members": [
-        {
-          "type": "SYMBOL",
-          "name": "constructor"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "identifier"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "_operator_symbol"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "parenthesized_operator"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "parenthesized_name"
-        }
-      ]
-    },
     "type_definition": {
       "type": "SEQ",
       "members": [
@@ -9401,10 +9376,6 @@
       "type_application"
     ],
     [
-      "data_constructor",
-      "_type_atom"
-    ],
-    [
       "_type",
       "strict_type"
     ],
@@ -9433,22 +9404,7 @@
       "operator_definition"
     ],
     [
-      "_pattern",
-      "record_update_pattern"
-    ],
-    [
-      "function_declaration",
-      "guard_body"
-    ],
-    [
-      "operator_definition",
-      "guard_body"
-    ],
-    [
       "_binding_tail"
-    ],
-    [
-      "function_declaration"
     ],
     [
       "operator_definition"
@@ -9485,10 +9441,6 @@
       "case_expression"
     ],
     [
-      "case_expression",
-      "case_alternative"
-    ],
-    [
       "special_block"
     ],
     [
@@ -9513,9 +9465,6 @@
     ],
     [
       "fixity_declaration"
-    ],
-    [
-      "type_signature"
     ],
     [
       "list_pattern",

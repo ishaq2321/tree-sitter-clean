@@ -739,3 +739,56 @@ Both are recorded here so the v1.2.5 release at 487 is a known,
 documented plateau: the remaining errors are these two families plus the
 pre-existing `;`-chain and _System-module issues — none reachable by an
 additive change without breaking the shared automaton states.
+
+## 10. Headroom audit (2026-09-21, bbcaa9f) — four measured dead ends
+
+A targeted hunt for cheap action-table headroom, run because the 16-bit
+ceiling (max action id **64767**) is what blocks the lexical `_`-constructor
+fix. Metric: `grep -oE "ACTIONS\([0-9]+\)" src/parser.c | … | tail -1`,
+same as every earlier measurement; safety check `cc | grep -c overflow`.
+All five probes were measured on the tagged v1.2.5 grammar.
+
+| Probe | Result | Max action id |
+|---|---|---|
+| Remove the 7 "unnecessary conflicts" declarations | `parser.c` **byte-identical** | 64767 (0) |
+| Remove the dead `_context_head` rule (0 references) | pruned by the generator | 64767 (0) |
+| Remove 9 duplicate alternatives from `_expression` (also reachable via `_expression_atom`) | tables change | 64767 (0) |
+| Make `operator_or` an **anonymous inline token** (same lexing, same precedence, no named node) | tables change | 64767 (0) |
+| Delete the whole `operator_or` tier (`binary_expression` alternative only) | **−606** | 64161 |
+
+What this establishes:
+
+1. **Declared-conflict and dead-rule cleanups are free but buy nothing.**
+   Unreachable rules are pruned before table construction, and a conflict
+   that never fires never added states. (Hygiene only: the 7 declarations and
+   `_context_head` were removed so `tree-sitter generate` is warning-free.)
+2. **Max action id is insensitive to symbol identity and to choice
+   duplication.** Reordering/canonicalising alternatives (9 duplicates removed
+   from `_expression`) and renaming a named token rule to an anonymous token
+   both changed `parser.c` bytes yet left the id at 64767. Only removing the
+   token's *acceptance in expression-completion states* moved it.
+3. **The per-tier operator tokens are load-bearing and their ~600 actions/tier
+   are irreducible.** The tiers exist to encode precedence lexically (`2 + 3 *
+   4` nests by token class, not by lookahead); with a single token class the
+   parser cannot know `*` binds tighter than `+`, so the tier cannot be
+   dropped, and (2) shows it cannot be made cheaper by renaming.
+4. **Removing an operator's own tier is not a viable trade**: −606 actions
+   but `||`/`or` stop parsing entirely.
+
+The historical big win (`range_expression`, −4232, §8) was a *reachable but
+shadowed* named rule whose parses were identical to paths that already
+existed — a lucky structural redundancy, not a repeatable pattern. The four
+probes above found no second one.
+
+**Consequence for the remaining gaps.** Neither outstanding family is
+actually headroom-blocked:
+
+- the INLINE continuation family *fits* (its attempt reached 65399, under the
+  ceiling) — it fails on shared-state pollution (+178 corpus errors), so it
+  needs state **isolation**, not headroom;
+- the `_`-constructor family needs a **context-sensitive** solution
+  (pattern-position-only), which is cheaper than the lexical regex that
+  overflowed.
+
+So the next productive move is isolated-state/context-sensitive designs for
+those two families — not further automaton re-engineering.
