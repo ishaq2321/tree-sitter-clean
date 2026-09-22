@@ -3,7 +3,7 @@
 # Problem nodes = ERROR + MISSING; error bytes = source bytes inside them (union of ranges);
 # wrapped = a top-level ERROR node covers >=50% of the file.
 # Regenerate after a verified release so the next gate compares against it.
-# totals: 544 problem nodes, 260010 error bytes, 3 wrapped
+# totals: 532 problem nodes, 258779 error bytes, 3 wrapped
 Clyde/Clyde.icl	0	0	0
 Clyde/Clyde/ClydeApplicationController.dcl	0	0	0
 Clyde/Clyde/ClydeApplicationController.icl	11	10	0
@@ -215,7 +215,7 @@ clean-stdlib/StdString.icl	0	0	0
 clean-stdlib/StdTuple.dcl	0	0	0
 clean-stdlib/StdTuple.icl	0	0	0
 clean-stdlib/_SystemArray.dcl	0	0	0
-clean-stdlib/_SystemArray.icl	12	1231	0
+clean-stdlib/_SystemArray.icl	0	0	0
 clean-stdlib/_SystemDynamic.dcl	0	0	0
 clean-stdlib/_SystemDynamic.icl	20	17663	1
 clean-stdlib/_SystemEnum.dcl	0	0	0

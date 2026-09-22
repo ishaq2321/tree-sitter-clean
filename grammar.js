@@ -2131,7 +2131,15 @@ module.exports = grammar({
         "}",
       ),
 
-    abc_instruction: ($) => token(/[^{}]+/),
+    // The body of `code { ... }` is opaque ABC text, so the token stops at a
+    // brace — but a quoted STRING inside the body may contain braces, and
+    // treating those as structural ended the body early and left the block's
+    // own `}` MISSING. That is what derailed every
+    // `buildAC "StdArray:select ({#} a) should not be called"` line in
+    // clean-stdlib/_SystemArray.icl. A quoted string is therefore part of the
+    // token, and quotes may not span a newline so an unbalanced quote cannot
+    // swallow the rest of the block.
+    abc_instruction: ($) => token(/(?:"[^"\n]*"|[^{}])+/),
 
     // ─────────────────────────────────────────────────────────────────────
     // Atoms (leaves of the expression tree)

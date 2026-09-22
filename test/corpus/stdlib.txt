@@ -208,3 +208,24 @@ g y = y:xs
       (identifier)
       operator: (operator_cons)
       (identifier))))
+
+==================
+Braces Inside a String in a `code` Block
+==================
+select arr index =
+	code
+	{
+		buildAC "StdArray:select ({#} a) should not be called"
+	.d 1 0
+		jsr print_string_
+	.o 0 0
+	}
+---
+
+(source_file
+  (function_declaration
+    (identifier)
+    (identifier)
+    (identifier)
+    (code_expression
+      (abc_instruction))))

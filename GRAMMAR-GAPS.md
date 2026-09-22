@@ -1339,3 +1339,29 @@ pattern position (`indexOfNewlineBefore -1 = -1`, line 118), a separate gap.
 |---|---|---|
 | `instance toString Target, Platform, Architecture` (comma-separated instance types, Target.dcl, 625 B) | **+2252** | unaffordable — a `,` after an instance-argument type atom touches ~750 instance states |
 | `import code from "NSWindow+DvA.o"` (Clyde, 116 B) | +19 | affordable, but **fires nothing**: `code` lexes as `module_identifier` (`/[a-zA-Z_][a-zA-Z0-9_'`]*/`, defined earlier) and wins the equal-length tie, so `import code` still parses as a module import. Making it work needs either a separate `token(prec(...))` for `code` — which would change keyword-vs-identifier lexing globally — or a `module_name "from" string` form, i.e. a new shift/reduce choice at a declaration boundary. Not worth 19 rows for 116 bytes; reverted. |
+
+### 14g. Shipped: braces inside a string in a `code` block (lexer-only, 0 rows)
+
+`abc_instruction: token(/[^{}]+/)` made the body of `code { ... }` stop at any
+brace — including one **inside a quoted string**. Every
+`buildAC "StdArray:select ({#} a) should not be called"` line in
+`clean-stdlib/_SystemArray.icl` therefore ended the body early, left the block's
+own `}` MISSING, and derailed the rest of the file: **12 problem nodes /
+1231 error bytes**, with the reported errors sitting *inside string literals*,
+which is the tell-tale of a lexer, not a parser, gap.
+
+The token is now `/(?:"[^"\n]*"|[^{}])+/`: a quoted string is part of the body,
+and a quote may not span a newline so an unbalanced quote cannot swallow the
+rest of the block.
+
+Because the token's *symbol* is unchanged this is **lexer-only**: max action
+row id 65245 → 65245 (**0**), state count unchanged, and the tokenization of
+pre-existing blocks is unchanged as well (the quoted part falls inside the same
+longest-match run), so all 108 existing corpus tests pass untouched.
+Effect: `_SystemArray.icl` **12 → 0 problem nodes, 1231 → 0 error bytes** — a
+clean-stdlib file that now parses clean. 109 corpus tests (one added).
+
+**Generalisation worth keeping:** a lexer-only fix costs no action rows at all,
+which makes it the cheapest kind of fix available at this ceiling — and its
+symptom is a reported error *inside* a literal (string/char/number), never at a
+token boundary. Check that symptom before touching the grammar.

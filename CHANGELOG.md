@@ -7,6 +7,16 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Braces inside a string in a `code { ... }` block.** The `abc_instruction`
+  token stopped at any brace, including one inside a quoted string, so
+  `buildAC "StdArray:select ({#} a) should not be called"` ended the ABC body
+  early, left the block's `}` MISSING and derailed the rest of the file. The
+  token now consumes quoted strings (which may not span a newline, so an
+  unbalanced quote cannot swallow the block). Because the token's *symbol* is
+  unchanged this is a lexer-only fix that costs **no action rows** — the
+  cheapest kind at the 65535 ceiling — and `clean-stdlib/_SystemArray.icl` goes
+  **12 → 0 problem nodes, 1231 → 0 error bytes**. One corpus test added.
+
 - **ADT extension declarations: `:: DiagnosticSource | TrailingWhitespacePass`.**
   Clean lets a module add constructors to a type it imported, and that
   constructor list starts with `|` — there is no `=`. Every Eastwood linter
