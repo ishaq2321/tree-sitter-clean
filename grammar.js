@@ -1958,7 +1958,13 @@ module.exports = grammar({
     // Clean `if` is an ordinary three-argument function). The function form
     // binds tighter than application (prec 13 > APPLICATION 12) so the
     // consequence stops before the alternative: `if c a b` must not parse the
-    // consequence as the application `a b`.
+    // consequence as the application `a b`. The CONDITION additionally accepts
+    // a field/index access — not an `_expression_atom` (the application rule
+    // lists those separately), so the plain atom left `if r.flag a b`
+    // unparsable: PmProject's `(if lo1.link_resources (...) True)` and
+    // CloogleServer's `if opts.reload_cache (doInBackground reloadCache) id
+    // (db,w)`. Only the condition is widened: widening all three operands
+    // creates a `!`-fork conflict with `_record`.
     if_expression: ($) =>
       choice(
         prec.left(
@@ -1975,7 +1981,7 @@ module.exports = grammar({
           13,
           seq(
             "if",
-            field("condition", $._expression_atom),
+            field("condition", choice($._expression_atom, $.field_access, $.index_access)),
             field("consequence", $._expression_atom),
             field("alternative", $._expression_atom),
           ),

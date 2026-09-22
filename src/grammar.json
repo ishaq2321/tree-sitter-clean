@@ -8056,8 +8056,21 @@
                 "type": "FIELD",
                 "name": "condition",
                 "content": {
-                  "type": "SYMBOL",
-                  "name": "_expression_atom"
+                  "type": "CHOICE",
+                  "members": [
+                    {
+                      "type": "SYMBOL",
+                      "name": "_expression_atom"
+                    },
+                    {
+                      "type": "SYMBOL",
+                      "name": "field_access"
+                    },
+                    {
+                      "type": "SYMBOL",
+                      "name": "index_access"
+                    }
+                  ]
                 }
               },
               {
