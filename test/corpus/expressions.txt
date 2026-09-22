@@ -421,3 +421,44 @@ where
                       (operator_compare)
                       (identifier)))))
               (identifier))))))))
+
+==================
+Functional If with a Field-Access Condition
+==================
+f = if r.flag a b
+---
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    body: (if_expression
+      condition: (field_access
+        record: (identifier)
+        field: (identifier))
+      consequence: (identifier)
+      alternative: (identifier))))
+
+==================
+Strict Equality Operator `=?=`
+==================
+instance < Target where (<) x y = (x =?= y)=:LT
+---
+
+(source_file
+  (instance_declaration
+    name: (instance_class
+      (operator_compare))
+    argument: (constructor)
+    (instance_member
+      (operator_definition
+        name: (parenthesized_operator)
+        pattern: (identifier)
+        pattern: (identifier)
+        body: (binary_expression
+          (paren_expression
+            (binary_expression
+              (identifier)
+              operator: (operator_compare)
+              (identifier)))
+          operator: (strict_equal)
+          (constructor))))))

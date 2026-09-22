@@ -1503,3 +1503,283 @@ bytes).
 
 Free action rows: **153**. Zero-row fixes (§14g, §15a) are the only kind that
 fits without shrinking the automaton first.
+
+## 16. Three dead ends measured against the same ceiling (2026-09-22, after edee2f1)
+
+Method note for future sessions: the scratch harness in `/tmp` does not survive a
+host restart. Rebuild it by compiling `src/parser.c` + `src/scanner.c` with
+`cc -shared` and loading that `.so` through `ctypes`, exactly as
+`scripts/corpus_regression.py` does — never through `npx tree-sitter parse`,
+whose cache is keyed by the language NAME only (see that script's docstring).
+
+**The headroom metric**: `action rows` = the highest index in
+`ts_parse_actions[]` in `src/parser.c`. It agrees with the gate and with the
+generator's own refusal message (a table of 66,572 rows is reported as
+"exceeds maximum value of 65535"). HEAD (`edee2f1`) = **65,382 rows, 153 free**.
+
+### 16a. Unique type parameters (`:: * Input *a = …`) — real Clean, parses, but +1 byte
+
+Clyde's `PmParse.icl` line 17 defines `:: * Input *a = { … }` (and `PmDriver`'s
+`add_subdir` declares `!*{#SubdirElem}`); the isolation matrix shows exactly one
+failing piece, the marked *parameter*:
+
+| shape | HEAD |
+|---|---|
+| `:: PState = { offside :: !Bool, curpos :: !Int }` (record type with field signatures) | clean |
+| the same with a trailing `};` | clean |
+| `:: * Input = { … }` (unique result, no parameters) | clean |
+| `:: Input *a = { file :: !a }` | **fails (3 bytes)** |
+| `:: * Input *a = { … }` | **fails (28 bytes)** |
+
+The fix is a one-line change in the parametrized branch of `type_definition`:
+
+```js
+repeat1(seq(optional($.uniqueness_star), field("parameter", $.type_variable)))
+```
+
+Two properties matter. The `parameter` field stays on the `type_variable`, so
+the tree shape is unchanged (`(type_definition (uniqueness_star) parameter:
+(type_variable) …)`); and an inline `optional` is required rather than a new
+named rule — a `_type_parameter` helper raises an unresolved conflict
+(`'::' constructor type_variable • identifier`, "specify a higher precedence")
+and generates the same tables anyway.
+
+Measured: **+23 rows** (65,382 → 65,405, spare 130); `PmParse.icl` **137 → 135
+problem nodes** (its first derail moves from line 18 to line 146, the `#` chain
+that is itself blocked); `PmDriver.icl` **union byte coverage 1138 → 1139**.
+
+That one byte is the blocker, and it is worth understanding before anyone
+retries this. Diffing the merged error *regions* against the committed build
+shows exactly one region changing — the ERROR at byte offset 78128 growing from
+7 to 8 bytes:
+
+```
+HEAD (78128, 78135) | TP (78128, 78136)   src = 'FModified :: !String '
+```
+
+One **space** character, at the end of line 1606 of a file whose parse is
+already broken 16 lines earlier by the `where` + `case` derail at line 1589
+(§16b). The signature itself is fine in isolation in all five combinations
+tried (with and without the trailing `;`, `!Files` as a strict constructor type,
+`(!DATE, !Files)` as a tuple of strict types). So the artifact is recovery
+noise nested inside an existing ERROR, not tree-shape damage — but it is still a
+byte the gate counts, and the gate fails on it. **Not shipped**; the change
+becomes shippable the moment the §16b `case` gap stops breaking line 1589.
+
+### 16b. `;` after a non-first `#`-group member in a case alternative (real gap, unaffordable)
+
+Clyde's `PmDriver.icl` lines 1593-1602 (the true reason its `where` block
+derails at line 1589) is a case alternative whose body is a `#` group:
+
+```clean
+    = case method of
+        CompileAsync _
+            # (compiler_process_ids,ps) = getCompilerProcessIds ps
+            # (_,ps) = ClearCompilerCaches compiler_process_ids ps;
+            -> ps
+```
+
+The isolation matrix isolates the trigger to a trailing `;` on a member that is
+*not* the first binding of the group (a `;` on the first binding is absorbed by
+the next member's leading separator and works):
+
+| shape (two `#` bindings, `;` on the second) | HEAD |
+|---|---|
+| `;` then `-> ps` on the next line | 1 problem |
+| `; -> ps` on the SAME line (no layout token involved) | 1 problem |
+| `;` then `-> ps` one level deeper | 1 problem |
+| no `;` at all | **clean** |
+| `;`, blank line, then `-> ps` | 1 problem |
+| `;` then `| a -> ps` | 1 problem |
+
+The winning parse ends the alternative at the `;` and invents
+`pattern: (MISSING identifier)` for the following `-> ps` — a body-less
+alternative plus a phantom pattern. Because the same-line variant fails too,
+this is **not** a layout/scanner problem.
+
+Four candidate fixes, all measured:
+
+* `optional(";")` after each member, in both the binding-first and guard-first
+  branches: **+424 rows** (65,829 — over the ceiling, spare −294) and the shapes
+  *still* fail. The cost lands in `case_alternative`'s 1,531-state generated
+  repeat.
+* `[$._case_alternative]` self-conflict → the generator answers
+  "unnecessary conflicts".
+* `[$.case_expression, $.case_alternative]` → also "unnecessary conflicts".
+* deleting the binding-first branch's trailing stray-`;` optional: **−77 rows**
+  (65,305, spare 230 — the cheapest row *saving* found in this pass) but the
+  shapes still fail, so it is a behaviour reduction with no compensating fix.
+  Reverted.
+
+The declarations are no-ops because the ambiguity lives inside the *generated*
+repeat rule (`case_alternative_repeat1`, visible in `--report-states-for-rule`),
+which has no name that `conflicts` can reference — the same reason the function
+body's member list is written as the hand-recursive `_binding_tail` (that one
+*is* declarable, and its declared conflict is what makes the trailing-`;`
+continuation win there). The equivalent re-expression here
+(`seq(pattern, guard_binding, $._binding_tail)`) is not a drop-in: it raises an
+unresolved `guard_body` + `with_block` conflict and regresses the multi-guard
+shape `pat | a -> ps | b -> q` from clean to 2 problems / 71 bytes.
+
+### 16c. Leading-operator continuation lines: disproved as a scanner problem
+
+Clean lets a line begin with an infix operator to continue the expression above
+it, and the corpus relies on it: 18 `&&`-led lines and 10 `||`-led lines at
+bracket depth 0 (`projdocument.icl` 462-463, `_SystemDynamic.icl` 116-122,
+`PmProject.icl` 307-316), plus 12 `!*`-led and 88 `->`-led type continuations.
+
+The tempting theory — that the scanner must not emit a layout token there — is
+**wrong**, and the measurement says so. At HEAD the `&&`-led guard condition
+parses **structurally correctly** with one zero-width ERROR (0 bytes) where the
+scanner's `LAYOUT_START` was consumed by error recovery. Suppressing that token
+(step 6 of `scan_impl`) makes it strictly worse: 0 → **92 bytes**, because the
+whole guard then becomes an ERROR. It also regresses the plain multi-guard shape
+`f cons` / `| a` / `= 1` / `| b` / `= 2` from clean to 1 problem (3 bytes).
+Suppressing at the same-column site (step 7) and at the deeper-binding site
+(step 8) changes nothing at all: the `||`-at-same-column shape still fails, so
+that one is a *grammar* gap, not a token-stream gap. All three scanner edits
+were reverted.
+
+Practical consequence: the `&&`/`||` continuation lines are not a byte cost at
+HEAD — they cost one phantom zero-width node each, which the *node* metric
+counts and the byte metric does not. They should not be chased as a scanner bug.
+
+### 16d. The `..` binary-range tier is load-bearing
+
+`prec.right(PREC.RANGE, seq($._expression, $.range_operator, $._expression))`
+costs about as much as any other operator tier (~514 rows, §14b), and `..`
+looked like a candidate for removal because Clean's `..` is normally a
+*list-range* token (`[0..n]`). Measured: removing that one alternative
+**increases** the table from 65,382 to **68,633 rows** (+3,251): the `..` token
+is then threaded through the other alternatives instead of having its own tier.
+Reverted. This closes the "find a spurious precedence level" idea for headroom.
+
+### What this pass leaves
+
+* Free rows: **153** (unchanged).
+* The two giant wrapped files are gated by the same ~1,632-row lambda/guard `#`
+  fix (§12), and `_SystemDynamic.icl` by `(_TypeFixedVar _)` (§13b, +1,337 rows).
+* The one change that is *verified to parse new real Clean* (`:: T *a`) is held
+  back by a single space byte of recovery noise in `PmDriver.icl` — i.e. by the
+  `case` gap in §16b. Those two are coupled: fix the `;` and both become
+  shippable together.
+* Cheapest row *savings* found: −77 (delete a stray-`;` optional, no fix), and
+  the ±23 of the `*a` parameter itself.
+
+## 17. v1.2.6 pass: five fixes shipped, the ceiling characterised, four blockers pinned (2026-09-22)
+
+Baseline for this pass: `edee2f1` (386 problem nodes / 157,923 error bytes /
+3 wrapped, action rows 65,382 of 65,535). End of pass: **322 nodes /
+156,254 bytes / 3 wrapped, action rows 65,462 (73 spare)**, `npx tree-sitter
+test` 116/116, gate PASS with no file worse in either metric.
+
+### 17a. Where the automaton's bulk actually lives
+
+`npx tree-sitter generate --report-states-for-rule -` prints a states-per-rule
+census (a state is counted for every rule in its closure, so the numbers
+overlap). The head of the report at HEAD:
+
+| rule | states | | rule | states |
+|---|---|---|---|---|
+| `binary_expression` | 10,257 | | `lambda_expression` | 1,770 |
+| `let_expression` | 3,541 | | `case_alternative_repeat1` | 1,531 |
+| `case_alternative` | 3,224 | | `where_block_repeat1` | 1,412 |
+| `case_expression` | 2,694 | | `let_before_expression` | 1,392 |
+| `if_expression` | 2,428 | | `case_expression_repeat2` | 1,364 |
+| `guard_equation` | 2,104 | | `array_expression` | 1,296 |
+
+The expression cascade is the whole story: every `_expression` context
+instantiates the operator tiers' states, and the *reduce* states split by
+lookahead (that is what the declared GLR conflicts buy). Consequence: the two
+things that cost thousands of rows are both "add a token to the follow set of a
+construct whose sub-states are multiplied by every context" (lambda parameters,
+guard lists) — not anything local.
+
+### 17b. The conflict list is load-bearing — audited, nothing removable
+
+All 33 entries of the `conflicts` table were checked by re-generating: the
+generator emits *"Unnecessary conflict"* warnings for entries it does not
+need, and there are **zero** such warnings at HEAD. (The one entry that once
+was unnecessary — `case_alternative` — was removed in the §16 pass.) So no
+headroom is available from pruning the table.
+
+Two changes were measured and rejected for cost this pass:
+
+* **`;` after a non-first `#` member of a case alternative** (Clyde's
+  PmDriver L1596): per-member absorption **+424 rows** (spare goes negative),
+  deleting the branch-end stray-`;` optional saves 77 rows but fixes nothing,
+  and declaring the conflict is a no-op because the ambiguity sits inside a
+  *generated* repeat rule. PmDriver's 1,138 bytes stay blocked by this.
+* **An inline (`_inline_layout_start`) member block in `guard_equation`** —
+  the right shape for §17d below, but `guard_equation` is 2,104 states and the
+  layout-block member choice is shared with class/instance/special/where
+  blocks (§ note: "layoutBlockMembers is reused … any member-choice change
+  leaks into all of them"), so it needs headroom we do not have.
+
+### 17c. The four wrapped files are *one* family, and it is the `#` follow set
+
+| file | error bytes | first derail |
+|---|---|---|
+| `LanguageServerTests.icl` | 62,593 | `\params` then a `#`-group then `=` body |
+| `PmParse.icl` | 56,572 | the same, nested in a `#`-group |
+| `_SystemDynamic.icl` | 17,663 | `(_TypeFixedVar _)` (a `_`-constructor application) |
+| `Symbol.icl` | 16,461 | the same lambda/`#` shape as LanguageServerTests |
+
+Together **153,289 of the 156,254 remaining error bytes (98%)**. The lambda
+half is the ~1,632-row fix (§12); the `_`-constructor half is ~1,337 rows
+(§13b). With 73 spare rows, the v1.2.6 release cannot move any of them — this
+is a headroom problem, not a grammar-shape problem.
+
+### 17d. What the *tail* actually was (the fixes this release ships)
+
+Every fix below was isolated with a minimal probe first, then measured on the
+gate; none regressed a file in either metric.
+
+| construct | cost | result |
+|---|---|---|
+| functional `if` condition may be a field/index access | **0 rows** | PmProject 390→0, CloogleServer 391→13, Link 216→16, builddb 36→0 |
+| `=?=` added to the existing `operator_compare` terminal | **0 rows** | Target.icl 138→52 |
+| `foreign export <Constructor>` (name may be a `constructor`) | +80 for three | projdocument 503→0 |
+| `derive` import over any `_type_atom` (not just a constructor) | (same batch) | Hover.dcl 28→0 |
+| `:: T (=: C …)` parenthesised abstract newtype | (same batch) | SymbolMapExample 48→4 |
+
+Two lessons for the next pass:
+
+1. **A zero-row fix is one that adds a lexeme or a production to a terminal
+   that already exists** — `=?=` joined `operator_compare`, and the `if`
+   widening reused `field_access` in a position where the automaton already
+   had the states. The `'abc'` fix (§14g) is the same shape.
+2. **Never introduce a hidden helper rule to "widen" a keyword's operand.**
+   Wrapping the widened `if` condition in `_if_condition: choice(…)` — a
+   single-reference hidden rule, i.e. one tree-sitter inlines — made *every*
+   `if c t e` in the corpus parse as an application (`if` re-lexed as a plain
+   identifier) and *freed* 52 rows while doing it. The inline `choice` at the
+   call site behaves correctly at the same row count. Root cause not chased;
+   the observable is recorded here because a row *decrease* paired with a
+   lexer regression is a trap for a measurement-driven pass.
+
+### 17e. Blockers pinned for the next pass (all measured, none shipped)
+
+* **PmDirCache.icl (465 B)** — not the `where` block it was thought to be
+  (§16): the trigger is `dropWarn f cons=:[a:x] | f a # (wrn,x) = dropWarn f x`
+  — a **`#` binding on the SAME LINE after an inline guard**. Six-shape matrix:
+  the inline guard with a deeper `= body` parses; adding a same-line `#`
+  member does not, because `| cond`'s condition is an `_expression` and a `#`
+  can start a `let_before_expression`, so the parser prefers to shift `#` as
+  another application argument to the condition and strands the bodies.
+  Closing it needs the inline member block of §17b.
+* **SemVer.icl (208 B)** — a case alternative whose guard block sits on
+  *DEEPER lines than the pattern*:
+  `0` / `| s == "0" -> Ok 0` / `| otherwise -> …` / `i` / … The grammar's
+  case-alternative branches both expect the `#`/`|` members at the pattern's
+  own level (`case_alternative`'s comment argues a `_layout_start` after a
+  pattern is unreachable in the pattern-continuation states). Same cost
+  problem as above.
+* **`import code from "NSWindow+DvA.o"` (windows.icl, 116 B)** — the form is
+  parseable, but `code` lexes as `module_identifier` in the import state, so
+  the alternative never fires (adding it is free: rows unchanged). Forcing it
+  with a dedicated `token(prec(3, "code"))` *does* fire — and breaks `code`
+  used as an ordinary identifier (`g code = code + 1` stops parsing), which is
+  legal Clean. Rejected: 116 bytes is not worth sacrificing a legal name.
+* **`instance C T1, T2` comma lists in instance heads** (Target.dcl, 625 B) —
+  +2,252 rows (§14), still unaffordable.

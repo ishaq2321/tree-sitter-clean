@@ -758,3 +758,16 @@ g x
       (identifier))
     (guard_body
       (identifier))))
+
+==================
+Foreign Export of a Constructor
+==================
+foreign export Build
+foreign export Run
+---
+
+(source_file
+  (foreign_export
+    name: (constructor))
+  (foreign_export
+    name: (constructor)))

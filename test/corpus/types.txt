@@ -478,3 +478,17 @@ definition module m
         (constructor)
         (strict_type
           (constructor))))))
+
+==================
+Parenthesised Abstract Newtype
+==================
+:: AbstractNewType (=: AbstractNewTypeConstructor Int)
+---
+
+(source_file
+  (type_definition
+    name: (constructor)
+    body: (type_definition_body
+      rhs: (type_application
+        (constructor)
+        (constructor)))))

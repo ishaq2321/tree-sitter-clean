@@ -3,16 +3,16 @@
 # Problem nodes = ERROR + MISSING; error bytes = source bytes inside them (union of ranges);
 # wrapped = a top-level ERROR node covers >=50% of the file.
 # Regenerate after a verified release so the next gate compares against it.
-# totals: 386 problem nodes, 157923 error bytes, 3 wrapped
+# totals: 322 problem nodes, 156254 error bytes, 3 wrapped
 Clyde/Clyde.icl	0	0	0
 Clyde/Clyde/ClydeApplicationController.dcl	0	0	0
-Clyde/Clyde/ClydeApplicationController.icl	11	10	0
+Clyde/Clyde/ClydeApplicationController.icl	3	6	0
 Clyde/Clyde/Console.dcl	0	0	0
 Clyde/Clyde/Console.icl	0	0	0
 Clyde/Clyde/DebugClyde.dcl	0	0	0
 Clyde/Clyde/DebugClyde.icl	1	23	0
 Clyde/Clyde/Link.dcl	0	0	0
-Clyde/Clyde/Link.icl	6	216	0
+Clyde/Clyde/Link.icl	5	16	0
 Clyde/Clyde/Process.dcl	0	0	0
 Clyde/Clyde/Process.icl	0	0	0
 Clyde/Clyde/coloured_line.dcl	0	0	0
@@ -26,7 +26,7 @@ Clyde/Clyde/outlineviewcontroller.icl	1	1	0
 Clyde/Clyde/projactions.dcl	0	0	0
 Clyde/Clyde/projactions.icl	0	0	0
 Clyde/Clyde/projdocument.dcl	0	0	0
-Clyde/Clyde/projdocument.icl	30	503	0
+Clyde/Clyde/projdocument.icl	3	0	0
 Clyde/Clyde/projwindowcontroller.dcl	0	0	0
 Clyde/Clyde/projwindowcontroller.icl	0	0	0
 Clyde/Clyde/tableviewcontroller.dcl	0	0	0
@@ -100,7 +100,7 @@ Clyde/cleantools/Pm/PmParse.icl	137	56572	1
 Clyde/cleantools/Pm/PmPath.dcl	0	0	0
 Clyde/cleantools/Pm/PmPath.icl	9	21	0
 Clyde/cleantools/Pm/PmProject.dcl	0	0	0
-Clyde/cleantools/Pm/PmProject.icl	5	390	0
+Clyde/cleantools/Pm/PmProject.icl	1	0	0
 Clyde/cleantools/Pm/PmTypes.dcl	0	0	0
 Clyde/cleantools/Pm/PmTypes.icl	0	0	0
 Clyde/cleantools/Util/StdPathname.dcl	0	0	0
@@ -235,14 +235,14 @@ cloogle.org/backend/Builtin/Predef.dcl	0	0	0
 cloogle.org/backend/Builtin/Predef.icl	0	0	0
 cloogle.org/backend/Builtin/Syntax.dcl	0	0	0
 cloogle.org/backend/Builtin/Syntax.icl	0	0	0
-cloogle.org/backend/CloogleServer.icl	22	391	0
+cloogle.org/backend/CloogleServer.icl	4	13	0
 cloogle.org/backend/Util/Cache.dcl	0	0	0
 cloogle.org/backend/Util/Cache.icl	7	12	0
 cloogle.org/backend/Util/Memory.dcl	0	0	0
 cloogle.org/backend/Util/Memory.icl	0	0	0
 cloogle.org/backend/Util/SimpleTCPServer.dcl	0	0	0
 cloogle.org/backend/Util/SimpleTCPServer.icl	0	0	0
-cloogle.org/backend/builddb.icl	2	36	0
+cloogle.org/backend/builddb.icl	1	0	0
 eastwood/src/languageServer/Compiler.dcl	0	0	0
 eastwood/src/languageServer/Compiler.icl	0	0	0
 eastwood/src/languageServer/Config.dcl	0	0	0
@@ -256,7 +256,7 @@ eastwood/src/languageServer/GotoDefinition.dcl	0	0	0
 eastwood/src/languageServer/GotoDefinition.icl	0	0	0
 eastwood/src/languageServer/GotoUtil.dcl	0	0	0
 eastwood/src/languageServer/GotoUtil.icl	5	25	0
-eastwood/src/languageServer/Hover.dcl	1	28	0
+eastwood/src/languageServer/Hover.dcl	0	0	0
 eastwood/src/languageServer/Hover.icl	0	0	0
 eastwood/src/languageServer/LockFile.dcl	0	0	0
 eastwood/src/languageServer/LockFile.icl	0	0	0
@@ -265,7 +265,7 @@ eastwood/src/languageServer/SemVer.icl	3	208	0
 eastwood/src/languageServer/Symbol.dcl	0	0	0
 eastwood/src/languageServer/Symbol.icl	16	16461	0
 eastwood/src/languageServer/Target.dcl	22	625	0
-eastwood/src/languageServer/Target.icl	2	138	0
+eastwood/src/languageServer/Target.icl	2	52	0
 eastwood/src/languageServer/TextDocumentUtil.dcl	0	0	0
 eastwood/src/languageServer/TextDocumentUtil.icl	1	8	0
 eastwood/src/languageServer/Util.dcl	0	0	0
@@ -314,5 +314,5 @@ eastwood/test/suite-default/someLib/TestModule.dcl	0	0	0
 eastwood/test/suite-default/someLib/TestModule.icl	0	0	0
 eastwood/test/suite-default/tooLarge.icl	0	0	0
 eastwood/test/suite-without-config/NoEastwoodYml.icl	0	0	0
-eastwood/test/symbol-map-example/SymbolMapExample.dcl	6	48	0
+eastwood/test/symbol-map-example/SymbolMapExample.dcl	2	4	0
 eastwood/test/symbol-map-example/SymbolMapExample.icl	0	0	0

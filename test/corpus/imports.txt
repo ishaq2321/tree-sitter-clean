@@ -1,9 +1,9 @@
-
 ==================
 Old-Style => Qualified Import
 ==================
 import Control.Monad => qualified join
 ---
+
 (source_file
   (import_declaration
     module: (module_name
@@ -16,6 +16,7 @@ Error Handler Definition
 ==================
 subscript_error => abort "Subscript error in !!||,index too large"
 ---
+
 (source_file
   (function_declaration
     name: (identifier)
@@ -29,6 +30,7 @@ Qualified Import with Module Alias
 import qualified Data.Foldable as Foldable
 import qualified Clyde.Process as SP
 ---
+
 (source_file
   (import_declaration
     module: (module_name
@@ -73,6 +75,7 @@ Backtick Operator Import
 ==================
 from Data.Func import $, hyperstrict, instance Functor ((->) r), mapSt, seqSt, on, `on`
 ---
+
 (source_file
   (import_declaration
     module: (module_name
@@ -90,12 +93,14 @@ from Data.Func import $, hyperstrict, instance Functor ((->) r), mapSt, seqSt, o
     (identifier)
     (identifier)
     (backtick_operator)))
+
 ==================
 Class Import with Member List and Record Subset
 ==================
 from Text import class Text(join,startsWith), instance Text String
 from syntax import :: ClassDef{class_ident,class_pos}
 ---
+
 (source_file
   (import_declaration
     module: (module_name
@@ -113,3 +118,19 @@ from syntax import :: ClassDef{class_ident,class_pos}
     (record_subset
       (identifier)
       (identifier))))
+
+==================
+Derive Import over a List Atom
+==================
+from LSP.Internal.Serialize import generic gLSPJSONEncode, derive gLSPJSONEncode [!]
+---
+
+(source_file
+  (import_declaration
+    module: (module_name
+      (module_identifier)
+      (module_identifier)
+      (module_identifier))
+    (identifier)
+    (identifier)
+    (list_type)))

@@ -3,9 +3,54 @@
 All notable changes to `tree-sitter-clean` are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [v1.2.6] - 2026-09-22
+
+Five more constructs from the 239-file Clean corpus (Clyde, clean-stdlib,
+Eastwood, cloogle.org), each isolated with a minimal probe and verified by the
+byte gate (`npm run regress`) and `npx tree-sitter test` (116/116).
+
+Against the committed baseline the gate moves **386 → 322 problem nodes,
+157,923 → 156,254 error bytes**, three wrapped files unchanged, **no file
+worse in either metric**. The action table is at **65,462 rows of the 65,535
+ceiling (73 spare)** — the automaton's hard limit is what keeps the four big
+files wrapped (see §17 of GRAMMAR-GAPS.md).
 
 ### Fixed
+
+- **Functional `if` with a field/index access as its condition: `if r.flag a b`.**
+  In Clean `if` is an ordinary function (`if c t e`), and the grammar's
+  function-form operands were `_expression_atom` only — a field/index access is
+  listed separately in the application rule, not in the atom set. So both
+  `(if lo1.link_resources (…) True)` (PmProject) and
+  `if opts.reload_cache (doInBackground reloadCache) id (db,w)` (CloogleServer)
+  derailed: **PmProject 390 → 0 error bytes, CloogleServer 391 → 13, Link.icl
+  216 → 16, builddb.icl 36 → 0.** Only the CONDITION is widened: widening all
+  three operands asks tree-sitter for a `!`-fork conflict with `_record`, and a
+  hidden helper rule for the widened condition broke `if` keyword lexing
+  outright (the declaration reparsed as an application). Zero action rows.
+
+- **`=?=` lexed as a comparison operator.** Eastwood's
+  `instance < Target where (<) x y = (x =?= y)=:LT` derailed because the
+  operator alphabet excludes `=` on purpose (it would swallow the definition
+  `=`), leaving `=` + `?=`. The lexeme joins the existing `operator_compare`
+  terminal rather than a new token, so the parse table is byte-identical
+  (**Target.icl 138 → 52 error bytes, zero action rows**).
+
+- **`foreign export` of a constructor** (`foreign export Build`,
+  `foreign export BuildAndRun` — Clyde's projdocument.icl). The exported name
+  accepted only a lowercase `identifier`, but a capitalised name lexes as a
+  `constructor`, so the declaration failed on its own name. Five sites in the
+  corpus.
+
+- **`derive` imports over any type atom**:
+  `from LSP.Internal.Serialize import derive gLSPJSONEncode [!]` (Hover.dcl)
+  requires the derived type to be a list atom, and the import item demanded a
+  `constructor`. The atom starts with `constructor`, so the tree of the
+  existing form is unchanged. Ten sites in the corpus.
+
+- **Abstract newtypes: `:: AbstractNewType (=: AbstractNewTypeConstructor Int)`**
+  (SymbolMapExample.dcl) — the parenthesised `=:` body of a definition module,
+  reusing the same synonym rule as the bare `:: T =: rhs` form.
 
 - **Multi-character single-quoted literals (`'abc'`) — Clean's "special syntax
   for `[Char]` lists".** A single-quoted literal of two or more characters is a
@@ -221,3 +266,4 @@ PmDirCache.icl. Action-table ceiling unchanged at 64042 (< 65535).
 [v1.2.3]: https://github.com/ishaq2321/tree-sitter-clean/releases/tag/v1.2.3
 [v1.2.4]: https://github.com/ishaq2321/tree-sitter-clean/releases/tag/v1.2.4
 [v1.2.5]: https://github.com/ishaq2321/tree-sitter-clean/releases/tag/v1.2.5
+[v1.2.6]: https://github.com/ishaq2321/tree-sitter-clean/releases/tag/v1.2.6
