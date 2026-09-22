@@ -2465,8 +2465,13 @@ module.exports = grammar({
     // (`A =.= B /\ C`); the corpus does not pin its fixity down further
     // (Data.GenEq itself is outside it), so this is usage-driven, not a claim
     // about Clean's own declaration.
+    // `=?=` rides on the comparison terminal: the operator alphabet excludes
+    // `=` (it would swallow the definition `=`), so `x =?= y` -- Eastwood's
+    // Target.icl instance body `(<) x y = (x =?= y)=:LT` -- lexed as `=` +
+    // `?=` and derailed. Adding the lexeme to this token (rather than a new
+    // token) reuses the terminal, so the automaton is unchanged.
     operator_compare: ($) =>
-      token(prec(1, choice("==", "=.=", "<>", "<", ">", "<=", ">="))),
+      token(prec(1, choice("==", "=?=", "=.=", "<>", "<", ">", "<=", ">="))),
     // Statement separator. Precedence 1 beats the default 0 of the rules it
     // separates, so a `;` after a member (case alternative, let-before
     // binding, ...) SHIFTS to continue the member list instead of reducing
