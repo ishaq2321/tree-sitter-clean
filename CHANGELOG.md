@@ -7,6 +7,20 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **ADT extension declarations: `:: DiagnosticSource | TrailingWhitespacePass`.**
+  Clean lets a module add constructors to a type it imported, and that
+  constructor list starts with `|` — there is no `=`. Every Eastwood linter
+  pass declares its own diagnostic source that way, so each pass module
+  derailed at that line. The new `type_definition` alternative reuses the
+  existing `data_constructors` rule, so the tree reads exactly like
+  `:: T = C`. Measured: **577 → 544 problem nodes, 260,705 → 260,010 error
+  bytes**, five files improved and none worse — `TrailingWhitespace.dcl` and
+  `BasicValueCAFs.dcl` now parse **clean**, `Compiler.icl` drops 541 → 1 error
+  byte. Costs +12 of the 302 spare action rows (0 overflow warnings). One
+  corpus test added. The comma-separated instance form
+  (`instance toString Target, Platform, Architecture`) was measured at +2252
+  rows and rejected; see §14f of GRAMMAR-GAPS.md.
+
 - **`//` inside a block comment no longer lets a `*/` close it.** Clean's rule
   is that a `//` inside `/* ... */` starts a *line* comment, so the rest of
   that line is inert and a `*/` on it closes nothing (stated verbatim in

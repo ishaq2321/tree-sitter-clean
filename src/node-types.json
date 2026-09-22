@@ -4136,6 +4136,20 @@
             "named": true
           }
         ]
+      },
+      "rhs": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "data_constructors",
+            "named": true
+          },
+          {
+            "type": "|",
+            "named": false
+          }
+        ]
       }
     }
   },

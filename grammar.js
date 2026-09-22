@@ -634,6 +634,20 @@ module.exports = grammar({
               alias($.underscore_constructor, $.constructor))),
           ),
         ),
+        // `:: DiagnosticSource | TrailingWhitespacePass` — an ADT EXTENSION
+        // declaration: Clean lets a module add constructors to a type it
+        // imported, and the list starts with `|` (no `=`). Eastwood declares
+        // exactly one per linter pass (`:: DiagnosticSource | <Pass>`), so
+        // every pass module derails without this alternative. Precedence 1
+        // makes the `|` shift beat the plain-abstract branch's reduce.
+        prec.left(1,
+          seq(
+            "::",
+            field("name", choice($.constructor,
+              alias($.underscore_constructor, $.constructor))),
+            field("rhs", seq($._pipe, $.data_constructors)),
+          ),
+        ),
         ),
         optional($._semi),
       ),

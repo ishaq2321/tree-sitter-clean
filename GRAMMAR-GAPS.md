@@ -1199,3 +1199,143 @@ must be treated as hard, whichever CLI is in use.
 So the remaining `_`-constructor gap is now a precise headroom problem, not a
 grammar-design problem: **buy ~1000 actions** (§10's "reduce the automaton
 elsewhere" path) and `constructor_pattern` can take the third alternative.
+
+---
+
+## 14. The ceiling is hard, and where the cheap bytes are (2026-09-21, 9daa9ef)
+
+A pass aimed at the remaining wrapped files. It closed one open question,
+corrected the measurement method, and shipped one gap. Starting point:
+**577 problem nodes / 260,705 error bytes / 4 wrapped**; pinned CLI 0.24.7
+`src/parser.c` max action row id **65233** (302 spare under 65535).
+
+### 14a. No escape hatch: ABI 15 enforces the same 65535 limit
+
+§10 and §13b left open "migrating to a tree-sitter version that widens the
+action encoding". It does not exist. tree-sitter **0.26.9** defaults to
+**ABI 15** and refuses to emit a parser for the same grammar:
+
+```
+$ tree-sitter generate --abi 15
+Error when generating parser
+Caused by:
+    Parse table action count 66572 exceeds maximum value of 65535
+```
+
+(That run is the `constructor_pattern` variant of §14c; the ceiling message is
+the point.) ABI 15 does not widen the field, so no CLI/runtime upgrade buys
+headroom. The 302 spare rows at HEAD are the entire budget, and the metric
+that matters is the **pinned** CLI's — 0.26.9 counts differently (it reported
+64620 for the same tree), so all §14 numbers are 0.24.7 numbers.
+
+### 14b. What an addition actually costs (measured, not guessed)
+
+Cost is **per token per state**, not per alternative or per rule (§10 probe 4
+said as much for token identity; this quantifies it):
+
+| probe (from HEAD) | rows | Δ | states |
+|---|---|---|---|
+| HEAD | 65233 | — | 39851 |
+| `binary_expression`: 15 precedence alternatives → 1 | 58036 | **−7197** | 36149 |
+| same 15 alternatives, but each precedence level's alternatives **merged into one inline `choice`** | 65233 | **0** | 39851 (byte-identical `parser.c`) |
+| both operands replaced by a narrower symbol (`$.application`) | 88471 | +23238 | 54089 |
+| `underscore_constructor` added to `constructor_pattern` | 66570 | +1337 | 40857 |
+
+Three consequences:
+
+1. **~514 rows per operator tier** (7197/14) — matching §10's −606 for
+   deleting `operator_or` outright. The tiers are load-bearing (they *are*
+   the precedence), so this is not a savings opportunity.
+2. **Merging same-precedence alternatives is a no-op** — the generator
+   expands `choice` inside a `seq` into the same productions, so
+   `operator_add`/`backtick_operator`/`operator`/`operator_pipe`/
+   `monad_bind`/`operator_dot` at `prec.left(ADD)` cost exactly what one
+   alternative with an inline choice costs.
+3. **A precedence-cascade rewrite is not the lever** either: replacing the
+   broad operands with narrower symbols made the automaton *bigger*
+   (+23238 rows), because a symbol's state set depends on where it is used,
+   not on how small its own rule is.
+
+The only levers are therefore (a) fewer tokens acceptable in a given state, or
+(b) fewer states — and both are blocked by real language features.
+
+### 14c. `_`-constructor patterns: closed as a dead end
+
+§13b proposed buying ~1000 actions so `constructor_pattern` could take a third
+alternative. Measured at HEAD with the pinned CLI: **+1337 rows** (66570, i.e.
+1035 *over* the ceiling when the 302 spare are spent), and the variant is not
+even a win —
+
+- `clean-stdlib/_SystemDynamic.icl` still wraps (the whole file becomes one
+  ERROR node: 20 → 1 problem nodes, **identical 17,663 error bytes**);
+- `clean-stdlib/_SystemDynamic.dcl` **regresses 0 → 10 problem nodes**, purely
+  from the token becoming acceptable in pattern-start states;
+- the target shape `(_TypeFixedVar _)` is the **only** occurrence of
+  `(_[A-Z]…)` in all 312 corpus files.
+
+So headroom would have to be bought *and* spent to make one line parse, at the
+cost of a file that is currently clean. Closed. (`_SystemDynamic.icl` needs
+three further independent constructs anyway: `{s & [pos] = c \\ c <-: h & pos <- [i..]}`
+at line 63, and the `instance … where` block from line 66.)
+
+### 14d. Method correction: find derail points from the first local ERROR
+
+A line-prefix bisect ("smallest prefix that fails") is **invalid**: truncating
+at line *n* leaves a declaration whose `=` is on line *n+1*, which is a real
+syntax error. `_SystemDynamic.icl` bisected to a bare `\t\t\t\t=\tis_valid_type type`,
+a file fragment with no context. The reliable signal is the first ERROR that is
+not a top-level wrapper, in the *whole* file. Doing that gives the ranking that
+should drive the work (error bytes, first local ERROR):
+
+| bytes | file | first local ERROR |
+|---|---|---|
+| 62593 | eastwood/test/LanguageServerTests.icl | line 728 (lambda let-before) — §12 |
+| 56599 | Clyde/cleantools/Pm/PmParse.icl | guard chains — §12 |
+| 17663 | clean-stdlib/_SystemDynamic.icl | 40:18 `(_TypeFixedVar _)` |
+| 16461 | eastwood/src/languageServer/Symbol.icl | 1:1 wrapper |
+| 1231 | clean-stdlib/_SystemArray.icl | 401:30 `{#} a` |
+| 1138 | Clyde/cleantools/Pm/PmDriver.icl | 644:2 `# ds = {ds & …}` |
+| 625 | eastwood/src/languageServer/Target.dcl | 55:25 `instance toString Target, Platform, …` |
+| 541 | eastwood/src/languageServer/Compiler.icl | 72:21 `:: DiagnosticSource \| Compiler` |
+| 519 | eastwood/src/languageServer/SemVer.icl | 47:12 `JSONEncode{\|Version\|} _ v = …` |
+| 503 | Clyde/Clyde/projdocument.icl | 462:3 `&& trace_n …` |
+| 465 | Clyde/cleantools/Pm/PmDirCache.icl | 94:2 `removedups :: ![DirCacheElem] -> …` |
+| 391 | cloogle.org/backend/CloogleServer.icl | 158:1 `Start w` + column-0 layout |
+
+Everything below the top four is under 1.3 KB, i.e. the long tail is ~44 KB
+across ~40 files at roughly 1 KB each. **The tail is a queue of small,
+independent rule gaps, not a headroom problem** — which is why §14e/§14f were
+measured patch-by-patch instead of by node count.
+
+### 14e. Shipped: ADT extension declarations (`:: T | C`)
+
+Clean lets a module add constructors to a type it imported, and that list
+starts with `|` — no `=`. Eastwood declares one per linter pass
+(`:: DiagnosticSource | TrailingWhitespacePass`), so every pass module derailed
+at that line. New alternative in `type_definition` (`prec.left(1)` so the `|`
+shift beats the plain-abstract branch's reduce), reusing the existing
+`data_constructors` rule so the tree matches `:: T = C`:
+
+```
+(type_definition (constructor)
+  (data_constructors (data_constructor (constructor))))
+```
+
+Cost **+12 rows** (65245, 290 spare), 0 overflow warnings, 107 → 108 corpus
+tests. Measured effect: **577 → 544 problem nodes, 260,705 → 260,010 error
+bytes**, five files improved, none worse —
+`TrailingWhitespace.dcl` 3 → 0 (**clean**), `BasicValueCAFs.dcl` 3 → 0
+(**clean**), `Compiler.icl` 25 → 3 (541 → 1 byte), `DocError.icl` 2 → 1,
+`SymbolMapExample.dcl` 10 → 6.
+
+`DocError.icl`'s remaining byte is the file's **own** bug, not the grammar's:
+line 67 `commentsContentWithLine :: ([Either (ParseError, Int) (FunctionDoc, [(ParseWarning, Int)])]))`
+has four `(`and five `)`. `Compiler.icl`'s residual is a negative literal in
+pattern position (`indexOfNewlineBefore -1 = -1`, line 118), a separate gap.
+
+### 14f. Measured and rejected in this pass
+
+| patch | rows | verdict |
+|---|---|---|
+| `instance toString Target, Platform, Architecture` (comma-separated instance types, Target.dcl, 625 B) | **+2252** | unaffordable — a `,` after an instance-argument type atom touches ~750 instance states |
+| `import code from "NSWindow+DvA.o"` (Clyde, 116 B) | +19 | affordable, but **fires nothing**: `code` lexes as `module_identifier` (`/[a-zA-Z_][a-zA-Z0-9_'`]*/`, defined earlier) and wins the equal-length tie, so `import code` still parses as a module import. Making it work needs either a separate `token(prec(...))` for `code` — which would change keyword-vs-identifier lexing globally — or a `module_name "from" string` form, i.e. a new shift/reduce choice at a declaration boundary. Not worth 19 rows for 116 bytes; reverted. |

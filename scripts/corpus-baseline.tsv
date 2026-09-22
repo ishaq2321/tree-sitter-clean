@@ -3,7 +3,7 @@
 # Problem nodes = ERROR + MISSING; error bytes = source bytes inside them (union of ranges);
 # wrapped = a top-level ERROR node covers >=50% of the file.
 # Regenerate after a verified release so the next gate compares against it.
-# totals: 577 problem nodes, 260705 error bytes, 3 wrapped
+# totals: 544 problem nodes, 260010 error bytes, 3 wrapped
 Clyde/Clyde.icl	0	0	0
 Clyde/Clyde/ClydeApplicationController.dcl	0	0	0
 Clyde/Clyde/ClydeApplicationController.icl	11	10	0
@@ -244,7 +244,7 @@ cloogle.org/backend/Util/SimpleTCPServer.dcl	0	0	0
 cloogle.org/backend/Util/SimpleTCPServer.icl	0	0	0
 cloogle.org/backend/builddb.icl	2	36	0
 eastwood/src/languageServer/Compiler.dcl	0	0	0
-eastwood/src/languageServer/Compiler.icl	25	541	0
+eastwood/src/languageServer/Compiler.icl	3	1	0
 eastwood/src/languageServer/Config.dcl	0	0	0
 eastwood/src/languageServer/Config.icl	3	15	0
 eastwood/src/languageServer/Constants.dcl	0	0	0
@@ -273,11 +273,11 @@ eastwood/src/languageServer/Util.icl	0	0	0
 eastwood/src/linter/EastwoodLint.icl	0	0	0
 eastwood/src/linter/Linter.dcl	0	0	0
 eastwood/src/linter/Linter.icl	0	0	0
-eastwood/src/linter/Pass/BasicValueCAFs.dcl	3	51	0
+eastwood/src/linter/Pass/BasicValueCAFs.dcl	0	0	0
 eastwood/src/linter/Pass/BasicValueCAFs.icl	0	0	0
 eastwood/src/linter/Pass/DocError.dcl	0	0	0
-eastwood/src/linter/Pass/DocError.icl	2	20	0
-eastwood/src/linter/Pass/TrailingWhitespace.dcl	3	56	0
+eastwood/src/linter/Pass/DocError.icl	1	2	0
+eastwood/src/linter/Pass/TrailingWhitespace.dcl	0	0	0
 eastwood/src/linter/Pass/TrailingWhitespace.icl	0	0	0
 eastwood/src/linter/Util/Configuration.dcl	0	0	0
 eastwood/src/linter/Util/Configuration.icl	0	0	0
@@ -314,5 +314,5 @@ eastwood/test/suite-default/someLib/TestModule.dcl	0	0	0
 eastwood/test/suite-default/someLib/TestModule.icl	0	0	0
 eastwood/test/suite-default/tooLarge.icl	2	100002	0
 eastwood/test/suite-without-config/NoEastwoodYml.icl	0	0	0
-eastwood/test/symbol-map-example/SymbolMapExample.dcl	10	78	0
+eastwood/test/symbol-map-example/SymbolMapExample.dcl	6	48	0
 eastwood/test/symbol-map-example/SymbolMapExample.icl	0	0	0

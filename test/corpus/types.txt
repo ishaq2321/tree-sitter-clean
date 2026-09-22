@@ -404,6 +404,7 @@ definition module m
 	= A !Int
 	| _Hidden !Int
 ---
+
 (source_file
   (module_declaration
     name: (module_name
@@ -431,6 +432,7 @@ definition module m
 :: _Alias
 	:== Env
 ---
+
 (source_file
   (module_declaration
     name: (module_name
@@ -441,3 +443,38 @@ definition module m
     name: (constructor)
     body: (type_definition_body
       rhs: (constructor))))
+
+==================
+ADT Extension Declarations (`:: T | C`)
+==================
+definition module m
+
+:: DiagnosticSource | Compiler
+:: DiagnosticSource
+	| DocError
+:: T | A | B !Int
+---
+
+(source_file
+  (module_declaration
+    (module_name
+      (module_identifier)))
+  (type_definition
+    (constructor)
+    (data_constructors
+      (data_constructor
+        (constructor))))
+  (type_definition
+    (constructor)
+    (data_constructors
+      (data_constructor
+        (constructor))))
+  (type_definition
+    (constructor)
+    (data_constructors
+      (data_constructor
+        (constructor))
+      (data_constructor
+        (constructor)
+        (strict_type
+          (constructor))))))
