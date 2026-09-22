@@ -1874,6 +1874,10 @@
         "required": true,
         "types": [
           {
+            "type": "constructor",
+            "named": true
+          },
+          {
             "type": "identifier",
             "named": true
           }

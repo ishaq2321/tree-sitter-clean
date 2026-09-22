@@ -266,7 +266,12 @@ module.exports = grammar({
     // and the Clean FFI). The two keywords are bare literals: defined before
     // `identifier`, so they win the lex in declaration-start states, exactly
     // like `module`/`implementation` do.
-    foreign_export: ($) => seq("foreign", "export", field("name", $.identifier)),
+    // The exported name is usually lowercase (`foreign export Run`), but Clyde
+    // exports constructors too (`foreign export Build`, `foreign export
+    // BuildAndRun` — projdocument.icl), and an uppercase name lexes as a
+    // `constructor`. Accepting both keeps the single-child `name` field shape.
+    foreign_export: ($) =>
+      seq("foreign", "export", field("name", choice($.identifier, $.constructor))),
 
     // `from M import x, y, :: Type`
     // `from M import` — items may also form a layout block on deeper lines
@@ -356,10 +361,15 @@ module.exports = grammar({
             $.constructor_subset,
           )),
         ),
+        // `derive gEq T` — the derived type may be any type atom, not just a
+        // constructor: `from LSP.Internal.Serialize import derive
+        // gLSPJSONEncode [!]` (Hover.dcl) derives over the list type. The
+        // atom starts with `constructor`, so the tree of the existing
+        // constructor form is unchanged.
         seq(
           "derive",
           $.identifier,
-          $.constructor,
+          $._type_atom,
         ),
         seq(
           "class",
@@ -632,6 +642,20 @@ module.exports = grammar({
             optional(choice("*", "!")),
             field("name", choice($.constructor,
               alias($.underscore_constructor, $.constructor))),
+          ),
+        ),
+        // `:: AbstractNewType (=: AbstractNewTypeConstructor Int)` — an
+        // ABSTRACT NEWTYPE in a definition module: the body is the
+        // parenthesised `=:` form of `type_definition_body`, which reuses the
+        // same synonym RHS rule as the unparenthesised `:: T =: rhs`.
+        prec.left(1,
+          seq(
+            "::",
+            field("name", choice($.constructor,
+              alias($.underscore_constructor, $.constructor))),
+            "(",
+            field("body", $.type_definition_body),
+            ")",
           ),
         ),
         // `:: DiagnosticSource | TrailingWhitespacePass` — an ADT EXTENSION

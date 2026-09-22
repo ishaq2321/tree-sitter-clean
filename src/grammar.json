@@ -226,8 +226,17 @@
           "type": "FIELD",
           "name": "name",
           "content": {
-            "type": "SYMBOL",
-            "name": "identifier"
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "identifier"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "constructor"
+              }
+            ]
           }
         }
       ]
@@ -714,7 +723,7 @@
             },
             {
               "type": "SYMBOL",
-              "name": "constructor"
+              "name": "_type_atom"
             }
           ]
         },
@@ -1718,6 +1727,57 @@
                         }
                       ]
                     }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "PREC_LEFT",
+              "value": 1,
+              "content": {
+                "type": "SEQ",
+                "members": [
+                  {
+                    "type": "STRING",
+                    "value": "::"
+                  },
+                  {
+                    "type": "FIELD",
+                    "name": "name",
+                    "content": {
+                      "type": "CHOICE",
+                      "members": [
+                        {
+                          "type": "SYMBOL",
+                          "name": "constructor"
+                        },
+                        {
+                          "type": "ALIAS",
+                          "content": {
+                            "type": "SYMBOL",
+                            "name": "underscore_constructor"
+                          },
+                          "named": true,
+                          "value": "constructor"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "STRING",
+                    "value": "("
+                  },
+                  {
+                    "type": "FIELD",
+                    "name": "body",
+                    "content": {
+                      "type": "SYMBOL",
+                      "name": "type_definition_body"
+                    }
+                  },
+                  {
+                    "type": "STRING",
+                    "value": ")"
                   }
                 ]
               }
