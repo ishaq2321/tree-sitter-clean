@@ -7,6 +7,46 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Multi-character single-quoted literals (`'abc'`) — Clean's "special syntax
+  for `[Char]` lists".** A single-quoted literal of two or more characters is a
+  list of characters, exactly like the double-quoted form, and it is valid in
+  patterns as well; Cloogle's own syntax reference documents it
+  (`abc = ['abc']`, `abc ['abc':rest] = True`), and Eastwood's `tooLarge.icl` is
+  a single 100,000-character one. The grammar accepted only ONE character, so
+  `'abc'` lexed as nothing at all and every file using the form derailed —
+  `tooLarge.icl` alone was 38% of the corpus's error bytes. New `char_list`
+  token, offered wherever `char` already is (`_expression_atom`,
+  `_pattern_atom`, `_pattern`). One character still lexes as `char`, and
+  `'Data.Map'.toList` still lexes as `single_quoted_name` (that token is
+  longer), so nothing else changes. Costs **+1** of the spare action rows and
+  takes the corpus from **439 → 386 problem nodes, 258,183 → 157,923 error
+  bytes**: `tooLarge.icl` 100,002 → 0, `cloogle.org/…/Predef.icl` 123 → 0,
+  `PmAbcMagic.icl` 177 → 0, `PmParse.icl` 155 → 137. Five corpus tests added.
+
+- **Negative literals in pattern position: `indexOfNewlineBefore -1 = -1`.**
+  `number` accepted only `~` as a sign prefix, so a negative literal could not
+  be used as a pattern anywhere (Eastwood's `Compiler.icl`). Adding `-` is
+  neutral in expression position — the per-tier operator tokens carry lexical
+  precedence and so still win the match, which leaves `x -1` a
+  `binary_expression` (verified by comparing trees before and after) — while in
+  pattern position no `-` operator is valid, so `-1` finally lexes as one
+  number. `Compiler.icl` now parses **clean** and `PmParse.icl` drops a further
+  9 problem nodes.
+
+- **Capitalized generic names: `JSONEncode{|Version|}`.**
+  `generic_case_definition` required a lowercase `identifier` for its name, but
+  Clean's built-in generics are capitalized and lex as `constructor`; Eastwood's
+  `SemVer.icl` and `LockFile.icl` declare them that way. Costs nothing — the
+  action table *shrank* by 28 rows — and `LockFile.icl` goes 10 → 0 problem
+  nodes, `SemVer.icl` 519 → 208 error bytes.
+
+- **Trailing `;` on every member of a guard chain.** Clyde ends each member with
+  one, including an inline `| c = e;` guard (Eastwood-adjacent `Link.icl`'s
+  `FindChar`/`FindQuoteChar`, `PmAbcMagic.icl`'s `SubStringToInt`); the
+  `#`-binding branch already absorbed the terminator but the guard branches did
+  not. Both guard branches (function and operator definitions) now accept it per
+  iteration and once at the end of the chain.
+
 - **Braces inside a string in a `code { ... }` block.** The `abc_instruction`
   token stopped at any brace, including one inside a quoted string, so
   `buildAC "StdArray:select ({#} a) should not be called"` ended the ABC body

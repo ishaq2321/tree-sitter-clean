@@ -104,7 +104,6 @@ from LSP.PublishDiagnosticsParams import derive gLSPJSONEncode PublishDiagnostic
     (identifier)
     (constructor)))
 
-
 ==================
 Single-Quoted Name (expression)
 ==================
@@ -160,7 +159,6 @@ c = False
   (function_declaration
     name: (identifier)
     body: (boolean)))
-
 
 ==================
 Type Signature
@@ -664,6 +662,7 @@ f x = case token of
 		| isLower x
 			-> b2
 ---
+
 (source_file
   (function_declaration
     name: (identifier)
@@ -701,3 +700,61 @@ infixl 7 mod
   (fixity_declaration
     precedence: (integer)
     operator: (identifier)))
+
+==================
+Semicolon-Terminated Guard Members
+==================
+FindChar c line linelen pos
+	| pos >= linelen		=  pos;
+	| c == line.[pos]		=  pos;
+					=  f c line linelen (pos+1);
+
+g x
+	# y = x;
+	= y;
+---
+
+(source_file
+  (function_declaration
+    (constructor)
+    (identifier)
+    (identifier)
+    (identifier)
+    (identifier)
+    (guard_equation
+      (binary_expression
+        (identifier)
+        (operator_compare)
+        (identifier))
+      (identifier))
+    (guard_equation
+      (binary_expression
+        (identifier)
+        (operator_compare)
+        (index_access
+          (identifier)
+          (identifier)))
+      (identifier))
+    (guard_body
+      (application
+        (application
+          (application
+            (application
+              (identifier)
+              (identifier))
+            (identifier))
+          (identifier))
+        (paren_expression
+          (binary_expression
+            (identifier)
+            (operator_add)
+            (number
+              (integer)))))))
+  (function_declaration
+    (identifier)
+    (identifier)
+    (guard_binding
+      (identifier)
+      (identifier))
+    (guard_body
+      (identifier))))

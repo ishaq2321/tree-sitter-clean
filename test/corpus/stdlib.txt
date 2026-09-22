@@ -229,3 +229,41 @@ select arr index =
     (identifier)
     (code_expression
       (abc_instruction))))
+
+==================
+Capitalized Generic Case Definition
+==================
+JSONEncode{|Version|} _ v = [JSONString (toString v)]
+JSONDecode{|Version|} _ [JSONString v:rest] = (error2mb (parseVersion v), rest)
+---
+
+(source_file
+  (generic_case_definition
+    (constructor)
+    (constructor)
+    (wildcard)
+    (identifier)
+    (list_expression
+      (application
+        (constructor)
+        (paren_expression
+          (application
+            (identifier)
+            (identifier))))))
+  (generic_case_definition
+    (constructor)
+    (constructor)
+    (wildcard)
+    (list_pattern
+      (constructor_pattern
+        (constructor))
+      (identifier)
+      (identifier))
+    (tuple_expression
+      (application
+        (identifier)
+        (paren_expression
+          (application
+            (identifier)
+            (identifier))))
+      (identifier))))

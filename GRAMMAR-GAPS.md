@@ -1365,3 +1365,141 @@ clean-stdlib file that now parses clean. 109 corpus tests (one added).
 which makes it the cheapest kind of fix available at this ceiling — and its
 symptom is a reported error *inside* a literal (string/char/number), never at a
 token boundary. Check that symptom before touching the grammar.
+
+## 15. Batch before v1.2.6: four gaps, one of them huge (2026-09-21, after 601b3f4)
+
+Corpus: **532 → 386 problem nodes, 258,779 → 157,923 error bytes** (a 39% cut),
+15 files improved, none worse, 3 wrapped, 116 corpus tests, and still only **153
+spare action rows**. The progression, each step measured on its own:
+
+| step | nodes | bytes |
+|---|---|---|
+| baseline (601b3f4) | 532 | 258,779 |
+| + capitalized generic names | 510 | 258,416 |
+| + trailing `;` on guard members | 450 | 258,138 |
+| + negative literals in patterns | 439 | 258,183 |
+| + `'abc'` char lists | **386** | **157,923** |
+
+### 15a. `'abc'` — Clean's "special syntax for [Char] lists" (**the big one**)
+
+Cloogle's own syntax reference (`Syntax.icl`) states the rule:
+
+```clean
+abc = ['a', 'b', 'c']     // Individual elements
+abc = ['a':['b':['c':[]]] // Head and tail, ending with the empty list
+abc = ['abc']             // Special syntax for [Char] lists
+abc ['abc':rest] = True   // The special syntax can als be used to patternmatch
+```
+
+A single-quoted literal of MORE THAN ONE character is a `[Char]` list, exactly
+like the double-quoted form — and it is valid in patterns too. The `char` token
+matched exactly one character, so `'abc'` lexed as *nothing*. What that cost:
+**`eastwood/test/suite-default/tooLarge.icl` is `Start = ['111…1']`, one
+100,000-character literal, and it alone was 38% of the corpus's error bytes.**
+`Predef.icl`'s 123 bytes were the same shape (`['1,1,2,3,5':s]`), as were
+`PmAbcMagic.icl`'s 177 and `UtilOptions.icl`'s 29.
+
+Fixed as a new `char_list` token (two or more *units*, a unit being a plain
+character or an escape) added wherever `char` already is: `_expression_atom`,
+`_pattern_atom`, `_pattern`. One character still lexes as `char`, and
+`'Data.Map'.toList` still lexes as `single_quoted_name` because that token is
+longer — the §7 fix is untouched (there is a corpus test for exactly that). In
+the same edit the `char` regex stopped allowing a quoted character to span a
+newline, so an unbalanced `'` can no longer swallow the rest of a file.
+Measured effect of this change alone: **439 → 386 problem nodes, 258,183 →
+157,923 error bytes**; `tooLarge.icl` **100,002 → 0**, `Predef.icl` **123 → 0**,
+`PmAbcMagic.icl` 177 → 0, `PmParse.icl` 155 → 137 nodes.
+
+**Two things worth keeping.**
+
+1. Cost is **+1 action row** (65,381 → 65,382 of 65,535). A new *token* whose
+   states are already reachable is nearly free; it is new *symbols in new
+   positions* that cost thousands (§14d/§14e).
+2. `(unit){2,}` does **not** work in a tree-sitter regex: the engine compiled the
+   open-ended repetition as exactly `{2}`, so `'ab'` lexed and `'abc'` did not
+   (an ERROR over the literal, which is the tell-tale of a lexer gap). Written
+   `unit unit+` it is correct. If a new token fails to match in a suspiciously
+   quantised way, check this first.
+
+### 15b. Capitalized generic names (`JSONEncode{|Version|}`)
+
+`generic_case_definition` required a lowercase `identifier` for its name, but
+Clean's built-in generics are CAPITALIZED (`JSONEncode{|Version|}`,
+`JSONDecode{|Version|}` in Eastwood's `SemVer.icl`/`LockFile.icl`) and lex as
+`constructor`. Allowing `choice($.identifier, $.constructor)` fixed
+`LockFile.icl` (10 → 0 problem nodes) and **reduced** the action table by 28
+rows — this one paid for itself.
+
+### 15c. Trailing `;` on every member of a guard chain
+
+Clyde ends EVERY member of a guard chain with `;`, including an inline
+`| c = e;` guard (`Link.icl`'s `FindChar`/`FindQuoteChar`, `PmAbcMagic.icl`'s
+`SubStringToInt`). The `#`-binding branch already absorbed the terminator; the
+guard branches did not. Both guard branches (function and operator definitions)
+now accept it per iteration **and** once at the end of the chain — the
+per-iteration optional alone cannot absorb the last one, because at that `;` the
+repeat's reduce wins over the shift (the same shape `case_alternative`'s
+guard-first branch already uses). Tried in the same batch and reverted: the same
+absorption on `case_alternative`'s guard bodies — it introduces conflicts and
+still does not fix its target.
+
+### 15d. Negative literals in pattern position
+
+`indexOfNewlineBefore -1 = -1` (Eastwood's `Compiler.icl`) needs `-1` as a
+**pattern**; `number` accepted only `~` as a sign prefix. Adding `-` to that
+prefix is neutral in expression position — the per-tier operator tokens carry
+lexical precedence and so still win the match, so `x -1` stays a
+`binary_expression` (verified by comparing trees before and after) — while in
+pattern position no `-` operator is valid, so `-1` finally lexes as one number.
+`Compiler.icl` is now **clean** (1 → 0 error bytes).
+
+One honest note: this change ALONE made the gate flag `Predef.icl` (+1 problem
+node, +46 error bytes). That was not a lexing change at all but error-recovery
+noise in an already-derailed region — the added region is nested inside an
+existing ERROR, and the reported token diff for the whole file was a single
+`->` that recovery consumed differently. Fixing the region's **root cause**
+(15a) removed the noise completely. A recovery-only delta in an already-broken
+file is a symptom to chase to its root, not automatically a reason to abandon a
+correct change — but it must be chased, not waved away.
+
+### 15e. Two measured dead ends in the same area
+
+* **`:: T *a = ...` — uniqueness on a type PARAMETER** (Clyde's
+  `:: * Input *a = { … }`, the first line of the wrapped `PmParse.icl`). A hidden
+  `_type_parameter: choice($.type_variable, seq(choice($.uniqueness_star, "!"),
+  $.type_variable))` used in `type_definition`'s two parameter positions costs
+  **+23 rows** (65,382 → 65,405) and parses every probe
+  (`:: T *a =`, `:: *T *a =`, `:: T a *b =`, `:: T *a`, `:: T !a =`), moving
+  `PmParse.icl`'s derail point from line 18 to line 146 (`| sym.repr==BarSymID
+  && char<>0` / `# (input,sym,line,char) = …`, the guard-chain-with-`#` family).
+  It does **not** unwrap the file (still 56,572 bytes) and it flips
+  `Config.icl` from 3 to 4 problem nodes: same first error, but a different
+  recovery shape. **Not shipped** — the gain is 2 nodes in a file that stays
+  wrapped, against a gate regression. Note the trap that cost a build: the bare
+  `"*"` literal in the new position does NOT work, because in the state after
+  `:: T` the generic `operator` token is also valid and the lexer picked it, so
+  `*a` lexed as an operator; the `uniqueness_star` rule (lexical precedence 2)
+  is what makes it lex correctly.
+
+* **`instance C T derive g` — derived instances.** Real Clean, six sites in the
+  corpus (`instance ConstructFromYAML CompilerSettingsConfig derive
+  gConstructFromYAML`, `instance == (Range t) | == t derive gEq`, …); without it
+  `Config.icl` cannot parse past line 26, and its signature on line 28 is the
+  visible casualty. `optional(seq("derive", field("generic", $.identifier)))`
+  after the instance head costs **+2,110 rows** — over the ceiling, with an
+  overflowed action table and a broken parser (67,645 rows). Blocked: this needs
+  headroom first.
+
+### The remaining picture
+
+Wrapped files: 3, and they are now 87% of what is left (136,828 of 157,923
+bytes).
+
+| wrapped file | error bytes | first real derail |
+|---|---|---|
+| `eastwood/test/LanguageServerTests.icl` | 62,593 | 1217 — `# (currentDirectory, w) = …` / `-> …`: let-before bindings after lambda parameters |
+| `Clyde/cleantools/Pm/PmParse.icl` | 56,572 | 146 — a guard chain whose first member is a `#` binding (`\| c` / `# (…) = …` / `\| c`) |
+| `clean-stdlib/_SystemDynamic.icl` | 17,663 | 40 — `(_TypeFixedVar _)`: a `_`-constructor used as a *pattern* |
+
+Free action rows: **153**. Zero-row fixes (§14g, §15a) are the only kind that
+fits without shrinking the automaton first.

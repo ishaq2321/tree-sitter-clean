@@ -98,6 +98,10 @@
         "named": true
       },
       {
+        "type": "char_list",
+        "named": true
+      },
+      {
         "type": "code_expression",
         "named": true
       },
@@ -201,6 +205,10 @@
     "subtypes": [
       {
         "type": "char",
+        "named": true
+      },
+      {
+        "type": "char_list",
         "named": true
       },
       {
@@ -372,6 +380,10 @@
             "named": true
           },
           {
+            "type": "char_list",
+            "named": true
+          },
+          {
             "type": "code_expression",
             "named": true
           },
@@ -467,6 +479,10 @@
           },
           {
             "type": "char",
+            "named": true
+          },
+          {
+            "type": "char_list",
             "named": true
           },
           {
@@ -1196,6 +1212,10 @@
             "named": true
           },
           {
+            "type": "char_list",
+            "named": true
+          },
+          {
             "type": "constructor",
             "named": true
           },
@@ -1643,6 +1663,10 @@
             "named": true
           },
           {
+            "type": "char_list",
+            "named": true
+          },
+          {
             "type": "code_expression",
             "named": true
           },
@@ -2023,6 +2047,10 @@
         "multiple": false,
         "required": true,
         "types": [
+          {
+            "type": "constructor",
+            "named": true
+          },
           {
             "type": "identifier",
             "named": true
@@ -2496,6 +2524,10 @@
           },
           {
             "type": "char",
+            "named": true
+          },
+          {
+            "type": "char_list",
             "named": true
           },
           {
@@ -4361,6 +4393,10 @@
           "named": true
         },
         {
+          "type": "char_list",
+          "named": true
+        },
+        {
           "type": "code_expression",
           "named": true
         },
@@ -4825,6 +4861,10 @@
   },
   {
     "type": "char",
+    "named": true
+  },
+  {
+    "type": "char_list",
     "named": true
   },
   {

@@ -1076,7 +1076,11 @@ module.exports = grammar({
     generic_case_definition: ($) =>
       prec.left(
         seq(
-          field("name", $.identifier),
+          // The generic function's name is usually lowercase (`gEq{|T|}`) but
+          // the built-in generics are CAPITALIZED and lex as constructors:
+          // `JSONEncode{|Version|} _ v = ...` (Eastwood's SemVer/LockFile) and
+          // `JSONDecode{|Version|}` right below it.
+          field("name", choice($.identifier, $.constructor)),
           seq(
             "{",
             $._pipe,
@@ -1160,8 +1164,21 @@ module.exports = grammar({
                     seq($.guard_body, optional($.with_block)),
                     $.guard_equation,
                   ),
+                  // A trailing `;` terminates the member (Clyde ends EVERY
+                  // member of a guard chain with one, including an inline
+                  // `| c = e;` guard: Link.icl's `FindChar`/`FindQuoteChar`,
+                  // PmAbcMagic's `SubStringToInt`). The `#`-binding branch has
+                  // always absorbed it; the guard branches did not, so only
+                  // the semicolon-terminated form derailed.
+                  optional(seq(";", optional($._layout_semicolon))),
                 ),
               ),
+              // The LAST member may end with `;` as well. The per-iteration
+              // optional above cannot absorb it: at that `;` the repeat's
+              // reduce wins over the shift, so the terminator has to be
+              // accepted here, once the repeat is exited (the same shape
+              // `case_alternative`'s guard-first branch already uses).
+              optional(seq(";", optional($._layout_semicolon))),
               optional($.where_block),
             ),
             // `f x` / `# y = g x` / `= body` — let-before bindings without
@@ -1247,8 +1264,21 @@ module.exports = grammar({
                     seq($.guard_body, optional($.with_block)),
                     $.guard_equation,
                   ),
+                  // A trailing `;` terminates the member (Clyde ends EVERY
+                  // member of a guard chain with one, including an inline
+                  // `| c = e;` guard: Link.icl's `FindChar`/`FindQuoteChar`,
+                  // PmAbcMagic's `SubStringToInt`). The `#`-binding branch has
+                  // always absorbed it; the guard branches did not, so only
+                  // the semicolon-terminated form derailed.
+                  optional(seq(";", optional($._layout_semicolon))),
                 ),
               ),
+              // The LAST member may end with `;` as well. The per-iteration
+              // optional above cannot absorb it: at that `;` the repeat's
+              // reduce wins over the shift, so the terminator has to be
+              // accepted here, once the repeat is exited (the same shape
+              // `case_alternative`'s guard-first branch already uses).
+              optional(seq(";", optional($._layout_semicolon))),
               optional($.where_block),
             ),
             // let-before bindings without guards (see function_declaration)
@@ -1469,6 +1499,7 @@ module.exports = grammar({
         $.number,
         $.string,
         $.char,
+        $.char_list,
         $.tuple_pattern,
         $.list_pattern,
         $.record_pattern,
@@ -1606,6 +1637,7 @@ module.exports = grammar({
         $.number,
         $.string,
         $.char,
+        $.char_list,
         $.tuple_pattern,
         $.list_pattern,
         $.record_pattern,
@@ -2159,6 +2191,7 @@ module.exports = grammar({
         $.number,
         $.string,
         $.char,
+        $.char_list,
         $.paren_expression,
         $.tuple_expression,
         $.list_expression,
@@ -2495,9 +2528,16 @@ module.exports = grammar({
     integer: ($) => /[0-9]+/,
     float: ($) => /[0-9]+\.[0-9]+([eE][+-]?[0-9]+)?|[0-9]+[eE][+-]?[0-9]+/,
 
+    // A leading `~` is Clean's unary minus on a literal (`~1`), and a leading
+    // `-` makes a NEGATIVE literal — which is the only reading available in
+    // pattern position (`indexOfNewlineBefore -1 = -1`, eastwood's
+    // Compiler.icl; `f (-1)` too). In expression position this changes
+    // nothing: the per-tier operator tokens carry lexical precedence, so `x -1`
+    // and `x-1` still lex as `binary_expression` with `-`, and `f = -1` stays
+    // `unary_expression` — verified by comparing trees before/after.
     number: ($) =>
       choice(
-        seq(optional(/[~]/), choice($.float, $.integer)),
+        seq(optional(/[~\-]/), choice($.float, $.integer)),
         /0[xX][0-9a-fA-F]+/, // hex
       ),
 
@@ -2505,7 +2545,23 @@ module.exports = grammar({
 
     // Char literals: `'a'`, `'\n'`, `'\''`, and octal escapes like `'\177'`
     // (backslash + 1-3 octal digits).
-    char: ($) => /'([^'\\]|\\([0-9]{1,3}|[^0-9]))'/,
+    char: ($) => /'([^'\\\n]|\\([0-9]{1,3}|[^0-9]))'/,
+
+    // Clean's "special syntax for [Char] lists": a single-quoted literal of
+    // TWO OR MORE characters is a list of characters, exactly like the
+    // double-quoted form. Cloogle's own Syntax.icl documents it:
+    //
+    //   "abc = ['abc']              // Special syntax for [Char] lists"
+    //   "abc ['abc':rest] = True    // ... can als be used to patternmatch"
+    //
+    // and Predef.icl uses it (`['1,1,2,3,5':s]`). One character stays `char`;
+    // `'Data.Map'.name` stays `single_quoted_name`, which is longer and so
+    // still wins the match (see the note on that rule).
+    // TWO units, `unit unit+`. The obvious `(unit){2,}` does NOT work here:
+    // tree-sitter's regex engine compiles the open-ended repetition as exactly
+    // `{2}`, so `'ab'` lexed but `'abc'` did not (verified by re-generating).
+    char_list: ($) =>
+      /'([^'\\\n]|\\([0-9]{1,3}|[^0-9]))([^'\\\n]|\\([0-9]{1,3}|[^0-9]))+'/,
 
     // `//` is always a line comment in Clean (the language reserves it — it
     // can never be an operator), so it must out-prioritise every operator

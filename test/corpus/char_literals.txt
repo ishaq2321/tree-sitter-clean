@@ -1,0 +1,112 @@
+================
+Single-character literal stays a `char`
+================
+
+module m
+
+f = ['a', '\n', '\177']
+
+---
+
+(source_file
+  (module_declaration
+    (module_name
+      (module_identifier)))
+  (function_declaration
+    (identifier)
+    (list_expression
+      (char)
+      (char)
+      (char))))
+
+================
+Multi-character literal is a [Char] list (Cloogle's syntax reference)
+================
+
+module m
+
+abc = ['abc']
+
+---
+
+(source_file
+  (module_declaration
+    (module_name
+      (module_identifier)))
+  (function_declaration
+    (identifier)
+    (list_expression
+      (char_list))))
+
+================
+Multi-character literal in pattern position (`abc ['abc':rest] = True`)
+================
+
+module m
+
+abc ['abc':rest] = True
+
+---
+
+(source_file
+  (module_declaration
+    (module_name
+      (module_identifier)))
+  (function_declaration
+    (identifier)
+    (list_pattern
+      (char_list)
+      (identifier))
+    (boolean)))
+
+================
+Multi-character literals nested in lists and applications
+================
+
+module m
+
+Predef = toString (['[':k] ++ ['1,1,2,3,5':s] ++ [']'])
+
+---
+
+(source_file
+  (module_declaration
+    (module_name
+      (module_identifier)))
+  (function_declaration
+    (constructor)
+    (application
+      (identifier)
+      (paren_expression
+        (binary_expression
+          (binary_expression
+            (list_expression
+              (char)
+              (identifier))
+            (operator)
+            (list_expression
+              (char_list)
+              (identifier)))
+          (operator)
+          (list_expression
+            (char)))))))
+
+================
+`'Data.Map'` module qualifier is still a single_quoted_name, not a char list
+================
+
+module m
+
+f = 'Data.Map'.toList diagnostics
+
+---
+
+(source_file
+  (module_declaration
+    (module_name
+      (module_identifier)))
+  (function_declaration
+    (identifier)
+    (application
+      (single_quoted_name)
+      (identifier))))
