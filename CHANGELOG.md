@@ -3,13 +3,13 @@
 All notable changes to `tree-sitter-clean` are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [v1.2.7] - 2026-09-23
 
-Three grammar fixes measured against the same 312-file corpus gate
-(`scripts/corpus_regression.py`): **322 → 334 problem nodes, 156,254 →
-108,936 error bytes (−47,318)**, wrapped files unchanged at 3, and the corpus
-suite growing 121 → 123 with two new regression tests. The action table is at
-**63,934 rows of the 65,535 ceiling (1,601 spare)**.
+Five grammar changes measured against the same 312-file corpus gate
+(`scripts/corpus_regression.py`): **322 → 297 problem nodes, 156,254 →
+78,193 error bytes (−78,061), wrapped files 3 → 2**. No file gets worse in
+problem nodes; the corpus suite stays green (123/123). The action table is at
+**64,484 rows of the 65,535 ceiling (1,051 spare)**.
 
 ### Fixed
 
@@ -21,26 +21,41 @@ suite growing 121 → 123 with two new regression tests. The action table is at
   qualifier followed, and a *silent* mis-parse (zero `generator` nodes) when it
   did not. The separator is now required, which is what Clean's syntax demands
   anyway. Collapsing the element-restart machinery also freed **2,694
-  parse-table rows** (73 → 2,767 spare at that point).
-- **Lambdas whose body is a let-before binding**:
+  parse-table rows**.
+- **Lambdas whose body is a let-before (`#`) binding**:
   `\dir world # paths = readDirectory dir world = (paths, world)` (Symbol.icl's
   scanDirectories, LanguageServerTests' root derail). The lambda body now
   accepts a `#` binding closed by `= result`; `prec.dynamic(-1)` keeps the
   comprehension interpretation winning when a `\\` follows a comprehension
   body. LanguageServerTests **62,593 → 436 bytes**, TextDocumentUtil 8 → 0.
+- **The same `#`-body closed by a `|`-guard**
+  (`\args world # (x, w) = f p w | isError x -> …`, GotoUtil.icl L236's mapSt
+  lambda): the closer set becomes `= | |`. This one change carries the release:
+  GotoUtil.icl **10,428 → 635 bytes** (its L236 wrap collapses to the L121
+  `->` residual), and — because a state change anywhere in the automaton can
+  re-decide an unrelated GLR fork — the `let`-qualifier region of Symbol.icl
+  now wins its fork instead of wrapping the file: **20,905 → 94 bytes**, with
+  SemVer.icl **208 → 69**.
 - **The `!?` operator** (`lines !? lineNr`, GotoUtil L104) joined the
   `operator_compare` token alongside `=?=` and `=.=`. Reusing the terminal
   leaves the automaton unchanged.
+- **`let` qualifier precedence.** `let_qualifier` carries `prec.right(1)` so a
+  multi-binding qualifier's continuation lines (`let a = e` then a
+  deeper-indented `b = e2`, Symbol.icl L470-472) stay reachable: with no
+  separator token between the value and the next binding, shift/reduce defaults
+  to SHIFT and the application swallows the next binding's name. Measured in
+  isolation the precedence change does not move the corpus numbers; it is kept
+  because it is what makes the continuation competitive at all.
 
-### Known recovery sites (see GRAMMAR-GAPS §18)
+### Known recovery site (see GRAMMAR-GAPS §19)
 
-- Symbol.icl 16,461 → 20,905 bytes: the separator fix reshuffles error
-  recovery at its L234 lambda, stretching the first wrap across the
-  previously-clean `icSymbol` signatures.
-- GotoUtil.icl 25 → 10,428 bytes: its L236 `mapSt` lambda
-  (`\args # b = e` then `| guard -> x` / `-> y` lines) needs the
-  function-body guard-member machinery, which was measured to overflow the
-  table in every flat form tried.
+- **GotoUtil.icl 25 → 635 bytes** — the file's L121 lambda,
+  `\(_, line) # firstColon = … -> if …`, closes its `#` body with an
+  **arrow**. Adding `$.arrow` to the closer set removes this residual (and
+  finishes LanguageServerTests at 0 bytes) but measurably re-wraps Symbol.icl
+  (94 → 20,905 bytes) and raises SemVer.icl (69 → 208): a net loss of 19,879
+  bytes, so the arrow is deliberately absent. The remaining 635 bytes are the
+  smaller side of that trade.
 
 ## [v1.2.6] - 2026-09-22
 

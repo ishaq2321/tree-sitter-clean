@@ -1820,24 +1820,23 @@ module.exports = grammar({
           choice(
             // `\x -> e` — the plain form.
             seq(choice($.arrow, "="), field("body", $._expression)),
-            // `\args # b = f x; = g b` — a let-before (`#`) CHAIN as the
-            // body, with NO arrow before it (Clean's form; Symbol.icl's
-            // scanDirectories L235 and LanguageServerTests' root derail are
-            // exactly this shape): bindings on the lines after the
-            // parameters, the chain's last member followed by `= result`.
-            // Each `#` line is an ordinary expression (let_before_expression)
-            // and the separator is the same token whether the chain continues
-            // or ends, so the parse is deterministic — no layout machinery,
-            // no GLR fork. (A _binding_tail-based group was measured first:
-            // its guard-binding-group/let-before ambiguity is live across
-            // EVERY guard context and overflowed the table (+12,145 actions);
-            // scoping forks to lambdas overflowed too. The flat chain has no
-            // ambiguity to fork on.)
-            // `\args # b = f x` then `= result` — a let-before (`#`)
-            // binding as the body, with NO arrow before it (Clean's form;
-            // Symbol.icl's scanDirectories L235 and LanguageServerTests'
-            // root derail are exactly this shape): the binding sits on the
-            // line(s) after the parameters and `= result` closes the body.
+            // `\args # b = f x` / `\args world # b = e | c -> x -> y` — a
+            // let-before (`#`) binding as the body, with NO arrow before it
+            // (Clean's form; Symbol.icl's scanDirectories L235 and
+            // LanguageServerTests' root derail are exactly this shape). The
+            // binding sits on the line(s) after the parameters and the body
+            // closes with `= result` (Symbol.icl, LSP) or with a `|`-guard
+            // whose condition expression absorbs the following `->` members
+            // (GotoUtil.icl L236's mapSt lambda: `# (x, world) = f p world`
+            // then `| isError x -> ...` and `-> ...`). The two closers share
+            // ONE expression position: a per-closer pair (`seq(closer,
+            // _expression)` per token) duplicates the whole expression state
+            // behind each and measured 65,544 actions — 9 OVER the 65,535
+            // table limit — so they collapse to a token choice. `$.arrow` is
+            // deliberately NOT in that choice: adding it measurably flips the
+            // GLR arbitration of the `let` qualifier below and re-wraps
+            // Symbol.icl (94 B -> 20,905 B), a net loss of 19,879 bytes
+            // (measured trade-offs: GRAMMAR-GAPS §19).
             // prec.dynamic(-1): at the backslash AFTER a comprehension body
             // (`[… ++ … \\ gen]`) this branch must LOSE to the comprehension
             // (where `\\` is the generator separator) — dynamic precedence
@@ -1848,16 +1847,7 @@ module.exports = grammar({
             // the corpus uses.)
             prec.dynamic(
               -1,
-              // The `= result` stays REQUIRED. Making it optional so the
-              // lambda could close right after the binding (GotoUtil.icl's
-              // mapSt lambda, L236, has `# b = e` then `| guard -> x` /
-              // `-> y` lines) cost +6,467 actions and overflowed
-              // (70,401); a guard-chain member list overflowed twice more
-              // (88,761 with guard_equation, 83,497 with inline members).
-              // GotoUtil's mapSt shape therefore stays a recovery site
-              // (documented in GRAMMAR-GAPS §18); the required form keeps
-              // the Symbol.icl / LanguageServerTests win.
-              seq($.let_before_expression, "=", field("body", $._expression)),
+              seq($.let_before_expression, choice("=", $._pipe), field("body", $._expression)),
             ),
           ),
         ),
@@ -2142,13 +2132,25 @@ module.exports = grammar({
     // a bare expression used as a comprehension guard
     guard: ($) => field("condition", $._expression),
 
+    // `let` qualifier of a comprehension. prec.right(1) is what keeps a
+    // MULTI-binding qualifier's continuation lines reachable at all: each
+    // continuation line starts with an identifier that the value expression
+    // could also consume as an application argument (`let a = e` then a
+    // deeper-indented `b = e2`, Symbol.icl L470-472 — with no separator token
+    // between them, since the continuation is indented DEEPER, the scanner
+    // emits no layout semicolon), and shift/reduce defaults to SHIFT. Giving
+    // this rule a precedence above the identifier's is what makes the reduce
+    // — and with it the end of the qualifier — competitive.
     let_qualifier: ($) =>
-      seq(
-        "let",
-        field("name", $.identifier),
-        repeat(field("parameter", $._pattern)),
-        "=",
-        field("value", $._expression),
+      prec.right(
+        1,
+        seq(
+          "let",
+          field("name", $.identifier),
+          repeat(field("parameter", $._pattern)),
+          "=",
+          field("value", $._expression),
+        ),
       ),
 
     // ---- Records ----

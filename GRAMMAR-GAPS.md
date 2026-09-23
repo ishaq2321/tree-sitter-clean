@@ -1877,3 +1877,77 @@ A probe that only asks "does it error?" can certify a wrong tree. Every probe
 in this pass now reports **error bytes *and* structural node counts** (here:
 `generator`), and every fix is re-checked against the released parser built
 from its tag, not against a remembered number.
+
+## 19. v1.2.7: one closer carries the batch, and the arrow that does not (2026-09-23, after 7358727)
+
+Batch 1 (commit `7358727`) left two open sites — the same two the gate named:
+**Symbol.icl 20,905 B** (whole-file wrap) and **GotoUtil.icl 10,428 B**
+(whole-file wrap). This pass isolated both to one token.
+
+### The measured matrix
+
+All rows are problem nodes / error bytes from the same 312-file gate
+(`scripts/corpus_regression.py`), the critical five files:
+
+| config | Symbol | LSP | SemVer | GotoUtil | rows |
+|---|---|---|---|---|---|
+| v1.2.6 (tag) | 16/16,461 | 9/62,593 | 3/208 | 5/25 | 63,934 |
+| `7358727` (batch 1) | 28/20,905 | 4/436 | 3/208 | 11/10,428 | 63,934 |
+| W = batch 1 + `let_qualifier prec.right(1)` | 28/20,905 | 4/436 | 3/208 | 11/10,428 | 63,930 |
+| **V = W + `|` in the `#`-body closer (shipped)** | **1/94** | **4/436** | **2/69** | **2/635** | **64,484** |
+| h2/k8 = V + `$.arrow` in the closer | 28/20,905 | 4/436 | 3/208 | 1/0 | 64,856 |
+
+The one-token step from W to V is what the release is made of: the closer set
+of a lambda's `#`-body goes from `=` to `= |`, and the *whole-file wraps of two
+different files disappear*, because a state change anywhere in the automaton
+can re-decide an unrelated GLR fork. The isolated probe shapes confirm the
+mechanism is not the construct itself: GotoUtil's L236 mapSt lambda parses
+error-free in V, and Symbol.icl's remaining 94 B is the multi-binding `let`
+(L470-472), whose isolation probe measures 233 B in **every** parser tried
+(v1.2.6, batch 1, V, and the tail variant below) with an identical tree.
+
+### The arrow that does not pay
+
+Adding `$.arrow` to the same closer set finishes GotoUtil (635 → 0) and LSP
+(436 → 0), but re-wraps Symbol.icl (94 → 20,905) and raises SemVer (69 → 208).
+Net: **+19,879 bytes** across the five files. The arrow is therefore
+deliberately absent, and GotoUtil's 635 B is the smaller side of the trade.
+It is not a table-space decision — the arrow config fits (64,856 rows, 679
+spare) — it is purely arbitration.
+
+### Dead ends, measured so nobody repeats them
+
+* **`_let_binding_tail`** — a right-recursive continuation-binding tail for
+  multi-binding `let` qualifiers (rule + `[$._let_binding_tail]` conflict +
+  `optional()` in `let_qualifier`). It was the intended fix for Symbol.icl's
+  construct, and a full gate run **without it is byte-identical on all 312
+  files** (297 nodes / 78,193 bytes / 2 wrapped, same four improved files, same
+  one regression) while costing 42 rows. Reason: at the continuation line's
+  identifier the application shift is taken before any tail state is
+  reachable, so the rule never fires. Deleted.
+* **Operator productions merged per precedence tier** — row-neutral where it
+  was tried, and a 1,700-line `src/parser.c` churn. Reverted with the
+  oversized config: the release is two one-line grammar changes, not a
+  refactor.
+* **Guard-member vocabulary for the `#`-body** (`guard_equation`, inline
+  members, optional trailing `=`) — 88,761 / 83,497 / 70,401 actions, all
+  over the 65,535 ceiling.
+
+### What the shipped `|`-closer does NOT do
+
+GotoUtil's mapSt lambda now parses with **zero errors, but the guard and the
+trailing `->` members are absorbed as generic `binary_expression` `operator`s**
+(the tree carries no `guard` node). The true structure needs the function-body
+member vocabulary, which overflows. So this is a recovery/metric win with a
+simplified tree, not a semantic fix — recorded here so a later pass does not
+mistake the 0-byte result for a correct parse. (The same absorption already
+happens inside `function_declaration` guard lists, so the behaviour is not new
+to the grammar; it is new to this construct.)
+
+### Rule of thumb earned
+
+**A grammar change that survives the gate without moving it is dead weight.**
+The gate is the arbiter: if no corpus file exercises a rule, delete it rather
+than keep it "for completeness" — it costs rows, a conflict declaration and
+reader attention, and (as `_let_binding_tail` shows) it can be inert while
+looking like the fix.
