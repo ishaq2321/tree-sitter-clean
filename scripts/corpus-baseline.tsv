@@ -3,7 +3,7 @@
 # Problem nodes = ERROR + MISSING; error bytes = source bytes inside them (union of ranges);
 # wrapped = a top-level ERROR node covers >=50% of the file.
 # Regenerate after a verified release so the next gate compares against it.
-# totals: 322 problem nodes, 156254 error bytes, 3 wrapped
+# totals: 297 problem nodes, 78193 error bytes, 2 wrapped
 Clyde/Clyde.icl	0	0	0
 Clyde/Clyde/ClydeApplicationController.dcl	0	0	0
 Clyde/Clyde/ClydeApplicationController.icl	3	6	0
@@ -255,19 +255,19 @@ eastwood/src/languageServer/GotoDeclaration.icl	0	0	0
 eastwood/src/languageServer/GotoDefinition.dcl	0	0	0
 eastwood/src/languageServer/GotoDefinition.icl	0	0	0
 eastwood/src/languageServer/GotoUtil.dcl	0	0	0
-eastwood/src/languageServer/GotoUtil.icl	5	25	0
+eastwood/src/languageServer/GotoUtil.icl	2	635	0
 eastwood/src/languageServer/Hover.dcl	0	0	0
 eastwood/src/languageServer/Hover.icl	0	0	0
 eastwood/src/languageServer/LockFile.dcl	0	0	0
 eastwood/src/languageServer/LockFile.icl	0	0	0
 eastwood/src/languageServer/SemVer.dcl	0	0	0
-eastwood/src/languageServer/SemVer.icl	3	208	0
+eastwood/src/languageServer/SemVer.icl	2	69	0
 eastwood/src/languageServer/Symbol.dcl	0	0	0
-eastwood/src/languageServer/Symbol.icl	16	16461	0
+eastwood/src/languageServer/Symbol.icl	1	94	0
 eastwood/src/languageServer/Target.dcl	22	625	0
 eastwood/src/languageServer/Target.icl	2	52	0
 eastwood/src/languageServer/TextDocumentUtil.dcl	0	0	0
-eastwood/src/languageServer/TextDocumentUtil.icl	1	8	0
+eastwood/src/languageServer/TextDocumentUtil.icl	0	0	0
 eastwood/src/languageServer/Util.dcl	0	0	0
 eastwood/src/languageServer/Util.icl	0	0	0
 eastwood/src/linter/EastwoodLint.icl	0	0	0
@@ -289,7 +289,7 @@ eastwood/src/sharedUtil/Range.dcl	0	0	0
 eastwood/src/sharedUtil/Range.icl	1	23	0
 eastwood/test/Common.dcl	0	0	0
 eastwood/test/Common.icl	0	0	0
-eastwood/test/LanguageServerTests.icl	9	62593	1
+eastwood/test/LanguageServerTests.icl	4	436	0
 eastwood/test/LinterTests.icl	0	0	0
 eastwood/test/suite-config-empty-paths/ok.icl	0	0	0
 eastwood/test/suite-config-missing-stdenv/GoToModule1.dcl	0	0	0
