@@ -1438,12 +1438,7 @@ module.exports = grammar({
     // zero-width token changed the layout stream for every `#` binding in
     // the corpus and wrecked recovery — measured 1074 vs 803.)
     _guard_binding_group: ($) =>
-      seq(
-        choice("#", "#!"),
-        field("pattern", $._pattern),
-        "=",
-        field("value", $._expression),
-      ),
+      seq(choice("#", "#!"), field("pattern", $._pattern), "=", field("value", $._expression)),
 
     // `pattern = expr` — a `#`-group continuation binding that DROPS the `#`
     // (`#! (a,b) = f env` then `(c,d) = g a` on the next line, same column).
@@ -1819,7 +1814,53 @@ module.exports = grammar({
     lambda_expression: ($) =>
       prec.left(
         PREC.LAMBDA,
-        seq($.lambda_start, repeat1(field("parameter", $._pattern)), choice($.arrow, "="), field("body", $._expression)),
+        seq(
+          $.lambda_start,
+          repeat1(field("parameter", $._pattern)),
+          choice(
+            // `\x -> e` — the plain form.
+            seq(choice($.arrow, "="), field("body", $._expression)),
+            // `\args # b = f x; = g b` — a let-before (`#`) CHAIN as the
+            // body, with NO arrow before it (Clean's form; Symbol.icl's
+            // scanDirectories L235 and LanguageServerTests' root derail are
+            // exactly this shape): bindings on the lines after the
+            // parameters, the chain's last member followed by `= result`.
+            // Each `#` line is an ordinary expression (let_before_expression)
+            // and the separator is the same token whether the chain continues
+            // or ends, so the parse is deterministic — no layout machinery,
+            // no GLR fork. (A _binding_tail-based group was measured first:
+            // its guard-binding-group/let-before ambiguity is live across
+            // EVERY guard context and overflowed the table (+12,145 actions);
+            // scoping forks to lambdas overflowed too. The flat chain has no
+            // ambiguity to fork on.)
+            // `\args # b = f x` then `= result` — a let-before (`#`)
+            // binding as the body, with NO arrow before it (Clean's form;
+            // Symbol.icl's scanDirectories L235 and LanguageServerTests'
+            // root derail are exactly this shape): the binding sits on the
+            // line(s) after the parameters and `= result` closes the body.
+            // prec.dynamic(-1): at the backslash AFTER a comprehension body
+            // (`[… ++ … \\ gen]`) this branch must LOSE to the comprehension
+            // (where `\\` is the generator separator) — dynamic precedence
+            // decides the GLR fork without any table growth. (Generalizations
+            // were measured and OVERFLOW: a _binding_tail group +12,145
+            // actions, a full binding chain +5,932, even after the
+            // list-separator headroom gain. The single-binding form is what
+            // the corpus uses.)
+            prec.dynamic(
+              -1,
+              // The `= result` stays REQUIRED. Making it optional so the
+              // lambda could close right after the binding (GotoUtil.icl's
+              // mapSt lambda, L236, has `# b = e` then `| guard -> x` /
+              // `-> y` lines) cost +6,467 actions and overflowed
+              // (70,401); a guard-chain member list overflowed twice more
+              // (88,761 with guard_equation, 83,497 with inline members).
+              // GotoUtil's mapSt shape therefore stays a recovery site
+              // (documented in GRAMMAR-GAPS §18); the required form keeps
+              // the Symbol.icl / LanguageServerTests win.
+              seq($.let_before_expression, "=", field("body", $._expression)),
+            ),
+          ),
+        ),
       ),
 
     // `let bindings in expr`
@@ -2008,7 +2049,16 @@ module.exports = grammar({
             // completing after `..` OUTSIDE brackets, which derailed
             // PmDriver (18 → 56 problem nodes).
             choice($.open_range_expression, $._expression),
-            repeat(seq(optional(choice(",", ":")), choice($.open_range_expression, $._expression))),
+            // The separator is REQUIRED, not optional: in Clean a `+`-separated
+            // element list always carries a delimiter. An optional one made the
+            // catch-all `operator` token (dual-purpose: infix AND prefix-unary)
+            // start a NEW ELEMENT at `++` in `[… ++ … ++ … \\ g]` — the
+            // prefix-unary branch (UNARY 10 beats the binary ADD 7) outlived the
+            // real comprehension, silently ate the `\\` generator as operator
+            // soup, and only failed (or silently mis-parsed) when a `let`
+            // qualifier finally contradicted it. Requiring the delimiter removes
+            // the bogus branch at the grammar level (Symbol.icl pd_types).
+            repeat(seq(choice(",", ":"), choice($.open_range_expression, $._expression))),
           ),
         ),
         optional("!"), // spine-strict marker: `[a:b!]`
@@ -2475,9 +2525,12 @@ module.exports = grammar({
     // `=` (it would swallow the definition `=`), so `x =?= y` -- Eastwood's
     // Target.icl instance body `(<) x y = (x =?= y)=:LT` -- lexed as `=` +
     // `?=` and derailed. Adding the lexeme to this token (rather than a new
-    // token) reuses the terminal, so the automaton is unchanged.
+    // token) reuses the terminal, so the automaton is unchanged. `!?` — the
+    // stdlib's maybe-index (`lines !? lineNr`, GotoUtil L104) — rides along
+    // the same way (`!` alone is operator_mul/unary; `??` and `?` stay
+    // Maybe/question tokens).
     operator_compare: ($) =>
-      token(prec(1, choice("==", "=?=", "=.=", "<>", "<", ">", "<=", ">="))),
+      token(prec(1, choice("==", "=?=", "=.=", "!?", "<>", "<", ">", "<=", ">="))),
     // Statement separator. Precedence 1 beats the default 0 of the rules it
     // separates, so a `;` after a member (case alternative, let-before
     // binding, ...) SHIFTS to continue the member list instead of reducing

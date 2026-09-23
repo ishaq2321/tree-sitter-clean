@@ -462,3 +462,36 @@ instance < Target where (<) x y = (x =?= y)=:LT
               (identifier)))
           operator: (strict_equal)
           (constructor))))))
+
+==================
+Lambda With Let-before Body
+==================
+module Sample
+scan dir world
+  = \dir world
+      # paths = readDirectory dir world
+      = (paths, world)
+---
+
+(source_file
+  (module_declaration
+    (module_name
+      (module_identifier)))
+  (function_declaration
+    (identifier)
+    (identifier)
+    (identifier)
+    (lambda_expression
+      (lambda_start)
+      (identifier)
+      (identifier)
+      (let_before_expression
+        (identifier)
+        (application
+          (application
+            (identifier)
+            (identifier))
+          (identifier)))
+      (tuple_expression
+        (identifier)
+        (identifier)))))

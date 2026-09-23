@@ -3,6 +3,45 @@
 All notable changes to `tree-sitter-clean` are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+Three grammar fixes measured against the same 312-file corpus gate
+(`scripts/corpus_regression.py`): **322 → 334 problem nodes, 156,254 →
+108,936 error bytes (−47,318)**, wrapped files unchanged at 3, and the corpus
+suite growing 121 → 123 with two new regression tests. The action table is at
+**63,934 rows of the 65,535 ceiling (1,601 spare)**.
+
+### Fixed
+
+- **Multi-line list comprehensions whose body chains two or more `++`
+  operators** (`[ … ++ … ++ … \\ gen, let q = e ]`). The element repeat's
+  *optional* separator let the catch-all `operator` token start a new element
+  at `++` as a prefix-unary expression; that branch outlived the comprehension
+  and ate the `\\` generator as operator soup — a visible error when a `let`
+  qualifier followed, and a *silent* mis-parse (zero `generator` nodes) when it
+  did not. The separator is now required, which is what Clean's syntax demands
+  anyway. Collapsing the element-restart machinery also freed **2,694
+  parse-table rows** (73 → 2,767 spare at that point).
+- **Lambdas whose body is a let-before binding**:
+  `\dir world # paths = readDirectory dir world = (paths, world)` (Symbol.icl's
+  scanDirectories, LanguageServerTests' root derail). The lambda body now
+  accepts a `#` binding closed by `= result`; `prec.dynamic(-1)` keeps the
+  comprehension interpretation winning when a `\\` follows a comprehension
+  body. LanguageServerTests **62,593 → 436 bytes**, TextDocumentUtil 8 → 0.
+- **The `!?` operator** (`lines !? lineNr`, GotoUtil L104) joined the
+  `operator_compare` token alongside `=?=` and `=.=`. Reusing the terminal
+  leaves the automaton unchanged.
+
+### Known recovery sites (see GRAMMAR-GAPS §18)
+
+- Symbol.icl 16,461 → 20,905 bytes: the separator fix reshuffles error
+  recovery at its L234 lambda, stretching the first wrap across the
+  previously-clean `icSymbol` signatures.
+- GotoUtil.icl 25 → 10,428 bytes: its L236 `mapSt` lambda
+  (`\args # b = e` then `| guard -> x` / `-> y` lines) needs the
+  function-body guard-member machinery, which was measured to overflow the
+  table in every flat form tried.
+
 ## [v1.2.6] - 2026-09-22
 
 Five more constructs from the 239-file Clean corpus (Clyde, clean-stdlib,

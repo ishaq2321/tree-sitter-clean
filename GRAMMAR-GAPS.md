@@ -1783,3 +1783,97 @@ Two lessons for the next pass:
   legal Clean. Rejected: 116 bytes is not worth sacrificing a legal name.
 * **`instance C T1, T2` comma lists in instance heads** (Target.dcl, 625 B) —
   +2,252 rows (§14), still unaffordable.
+
+## 18. The list-element separator: a mis-parse fixed and 2,694 rows freed (2026-09-22, after 99c04da)
+
+Started from the v1.2.6 tag and its question: *why did Symbol.icl regress by
+~7 KB since v1.2.5, and can it be fixed without new grammar symbols?*
+
+### The measurement trap first
+
+The regression figure itself was wrong twice over, and both corrections came
+from the same lesson — **count the structure, not just the errors**:
+
+1. The original "+7,063 bytes" came from summing `end_byte - start_byte` over
+   every bad node, which *double-counts nested ERRORs*. The gate's own metric
+   (union of byte ranges) showed only **+81 bytes** at that point.
+2. A "comprehension regression" chase was then built on probes whose Clean
+   generator separator was written with **one backslash** (`\ x <- xs`)
+   instead of two (`\\ x <- xs`). Those probes are simply invalid Clean and
+   fail in every parser, so they "proved" a hijack that did not exist. The
+   matrix was re-run with real `\\` and with a **`generator`-node count** —
+   not just an error count — because the worst comprehension defect was
+   *silent*: 0 errors, 0 `generator` nodes.
+
+### What the real defect was
+
+In `[ … ++ … ++ … \\ gen ]` the element repeat's separator was optional:
+`repeat(seq(optional(choice(",", ":")), element))`. The catch-all `operator`
+token is dual-purpose (infix *and* prefix-unary, UNARY 10 > ADD 7), so at a
+`++` the optional separator let a second element start as a prefix-unary
+expression. That branch outlived the comprehension version, swallowed the
+`\\` as an operator, and only failed when a `let` qualifier contradicted it —
+otherwise it produced an **error-free, wrong tree**. Requiring the separator
+(`repeat(seq(choice(",", ":"), element))`) removes the branch at the grammar
+level. Verified with six shapes (1/2/3 `++`, oneline and multiline, with and
+without `let`): all error-free with real `generator` nodes; two of them were
+visible errors and one a silent mis-parse at v1.2.6.
+
+### The headroom dividend
+
+The same change collapsed the element-restart state machinery: **65,462 →
+62,768 rows, spare 73 → 2,767**. That is the third time this pattern has paid
+(mandatory separators remove duplicated expression states); it was promptly
+spent on the lambda fix below (→ 63,934, spare 1,601).
+
+The same experiment was tried on `let_expression`'s binding separator and
+**backfired: +3,800 rows** (74,200 total, overflow). The hypothesis that every
+optional separator hides the same leak is therefore **wrong** — the win is
+specific to repeated *expression* elements whose restart states duplicate the
+whole expression automaton.
+
+### The lambda `#`-body
+
+Symbol.icl (L235) and LanguageServerTests' root derail have the shape
+`\args world` then deeper `# binding` lines then `= result` — a lambda whose
+body is a let-before binding, **with no arrow before it**. The body choice now
+accepts `let_before_expression "=" _expression`, with `prec.dynamic(-1)` so
+that at a `\\` following a comprehension body the comprehension interpretation
+(where `\\` is the generator separator) wins the fork. Result:
+LanguageServerTests **62,593 → 436 bytes** and TextDocumentUtil 8 → 0 — the
+single biggest file win of the pass.
+
+Two more changes ride along: `!?` joined the `operator_compare` token (the
+same terminal-reuse trick as `=?=`, table-neutral), fixing GotoUtil's L104
+`lines !? lineNr` root.
+
+### Gate result and the two open sites
+
+```
+baseline  322 nodes / 156,254 bytes / 3 wrapped
+current   334 nodes / 108,936 bytes / 3 wrapped
+delta     +12 nodes / -47,318 bytes / +0 wrapped
+```
+
+* **Symbol.icl 16,461 → 20,905** — byte-identical before and after the lambda
+  work, so it is purely the separator fix's recovery reshuffle: the L1 wrap
+  now stretches through the previously-clean `icSymbol` signature block
+  (9,700 → 20,044). The bytes it gains are the recovery *extent*, not new
+  constructs.
+* **GotoUtil.icl 25 → 10,428** — its L236 `mapSt` lambda is
+  `\args world` then `# b = e` then `| guard -> x` / `-> y` lines: the `#`
+  binding is closed by *guards*, not by `= result`, so the new body branch
+  dies at the `|` and recovery cascades into a whole-file wrap. Three flat
+  forms were built and all three overflowed: a guard-chain body reusing
+  `guard_equation` (88,761 actions), one with inline members (83,497), and
+  making the trailing `=` optional (70,401). The construct needs the same
+  member vocabulary the function body uses, which is only affordable if that
+  vocabulary is **extracted into one shared rule** (so the states are not
+  duplicated per context) — the next thing to try here.
+
+### Rule of thumb earned
+
+A probe that only asks "does it error?" can certify a wrong tree. Every probe
+in this pass now reports **error bytes *and* structural node counts** (here:
+`generator`), and every fix is re-checked against the released parser built
+from its tag, not against a remembered number.

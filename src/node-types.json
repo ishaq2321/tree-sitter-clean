@@ -2940,6 +2940,10 @@
         {
           "type": "lambda_start",
           "named": true
+        },
+        {
+          "type": "let_before_expression",
+          "named": true
         }
       ]
     }
@@ -4853,7 +4857,8 @@
   },
   {
     "type": "block_comment",
-    "named": true
+    "named": true,
+    "extra": true
   },
   {
     "type": "boolean",
@@ -4977,7 +4982,8 @@
   },
   {
     "type": "line_comment",
-    "named": true
+    "named": true,
+    "extra": true
   },
   {
     "type": "module",

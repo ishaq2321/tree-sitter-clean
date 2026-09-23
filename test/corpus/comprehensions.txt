@@ -170,3 +170,69 @@ locations = [! v \\ v <- ls | isJust v]
           (application
             (identifier)
             (identifier)))))))
+
+==================
+List Comprehension With Multi-line Binary Body And Let Qualifier
+==================
+module Sample
+Start = flatten
+	[ [ a def ptd ] ++
+	  map (c ptd) xs ++
+	  map (r ptd) ys
+	  \\ def=:(PD_Type ptd) <- defs,
+	  let t = toT ptd ]
+---
+
+(source_file
+  (module_declaration
+    (module_name
+      (module_identifier)))
+  (function_declaration
+    (constructor)
+    (application
+      (identifier)
+      (list_comprehension
+        (binary_expression
+          (binary_expression
+            (list_expression
+              (application
+                (application
+                  (identifier)
+                  (identifier))
+                (identifier)))
+            (operator)
+            (application
+              (application
+                (identifier)
+                (paren_expression
+                  (application
+                    (identifier)
+                    (identifier))))
+              (identifier)))
+          (operator)
+          (application
+            (application
+              (identifier)
+              (paren_expression
+                (application
+                  (identifier)
+                  (identifier))))
+            (identifier)))
+        (comprehension_sep)
+        (comprehension_qualifier
+          (generator
+            (strict_binding_pattern
+              (identifier)
+              (strict_equal)
+              (paren_pattern
+                (constructor_pattern
+                  (constructor)
+                  (identifier))))
+            (generator_sep)
+            (identifier)))
+        (comprehension_qualifier
+          (let_qualifier
+            (identifier)
+            (application
+              (identifier)
+              (identifier))))))))
