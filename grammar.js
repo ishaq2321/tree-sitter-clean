@@ -217,6 +217,7 @@ module.exports = grammar({
       choice(
         $.module_declaration,
         $.import_declaration,
+        $.foreign_code_import,
         $.fixity_declaration,
         $.type_definition,
         $.type_signature,
@@ -331,6 +332,44 @@ module.exports = grammar({
           // `.dcl` modules: `import M;` / `from M import x;`
           optional(";"),
         ),
+      ),
+
+    // ---- Foreign Code Import (FCI) ----
+    //   `import code from "a.o"`
+    //   `import code from library "CleanSerial_library"`
+    //   `import code from "a.o", library "L", library "M"`
+    //
+    // A foreign-code import names OBJECT FILES and LIBRARIES, not a Clean
+    // module, so it is a declaration in its own right rather than an
+    // `import_declaration` with a different item list: there is no module to
+    // bind, and the thing being bound is a linker input. It is the first
+    // unreadable construct in 30 corpus files at v1.2.7 (CleanSerial,
+    // clean-graph-copy, clean-ide/Mac, and the ObjectIO FCI layers), and because
+    // one unreadable declaration can make tree-sitter wrap a whole file in one
+    // ERROR, that understates it.
+    //
+    // The item list is line-agnostic and a trailing comma is allowed, because
+    // the ObjectIO FCI files write the list across lines and end it with a
+    // comma (`import code from "a.o",` / `"b.o",` / `"c.o",`).
+    foreign_code_import: ($) =>
+      seq(
+        "import",
+        "code",
+        "from",
+        $.foreign_code_item,
+        repeat(seq(",", $.foreign_code_item)),
+        optional(","),
+        // `.dcl` modules close the declaration with `;`
+        optional(";"),
+      ),
+
+    // `"a.o"` — an object file; `library "L"` — a named library.
+    // `library` is a context keyword: it is a literal only where an FCI item is
+    // expected, so it stays usable as an ordinary identifier elsewhere.
+    foreign_code_item: ($) =>
+      seq(
+        optional("library"),
+        field("object", $.string),
       ),
 
     // A single imported item:
@@ -607,7 +646,7 @@ module.exports = grammar({
             optional(choice("*", "!")),
             field("name", choice($.constructor,
               alias($.underscore_constructor, $.constructor))),
-            repeat1(field("parameter", $.type_variable)),
+            repeat1(field("parameter", $._type_parameter)),
             field("body", $.type_definition_body),
           ),
         ),
@@ -632,7 +671,7 @@ module.exports = grammar({
             "::",
             field("name", choice($.constructor,
               alias($.underscore_constructor, $.constructor))),
-            repeat1(field("parameter", $.type_variable)),
+            repeat1(field("parameter", $._type_parameter)),
           ),
         ),
         // `:: T` — abstract type
@@ -706,6 +745,24 @@ module.exports = grammar({
       ),
 
     type_variable: ($) => $.identifier,
+
+    // A type variable in a DECLARATION PARAMETER LIST, which may be unique.
+    //
+    // `:: * Input *a = { offside :: !Bool, ... }` (Clyde's PmParse.icl:17) is a
+    // synonym whose parameter list is `*a`, a unique type variable. The rule
+    // above this one is a bare identifier, and the comment in `type_definition`
+    // has always claimed the construct was accepted ("Parameters may carry
+    // uniqueness") — it was not, and that single declaration made tree-sitter
+    // wrap the whole file in one ERROR spanning 1,328 lines.
+    //
+    // The lexer resolves `*a` as the uniqueness token plus an identifier, which
+    // reaches the parser as `uniqueness_type`. Allowing `type_variable` to
+    // match it as well instead would give the grammar TWO ways to read the same
+    // three tokens and force a shift/reduce conflict at every parameter list,
+    // so the parameter list accepts the form the lexer actually produces.
+    // `*a` in a parameter position IS a unique type, and `uniqueness_type` is
+    // the node that says so — nothing is lost by not re-labelling it.
+    _type_parameter: ($) => choice($.type_variable, $.uniqueness_type),
 
     // `= Cons a (List a) | Nil`
     data_constructors: ($) =>

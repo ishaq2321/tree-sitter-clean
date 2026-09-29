@@ -134,3 +134,35 @@ from LSP.Internal.Serialize import generic gLSPJSONEncode, derive gLSPJSONEncode
     (identifier)
     (identifier)
     (list_type)))
+
+==================
+Foreign Code Import (object file)
+==================
+import code from "ctty.o"
+---
+
+(source_file
+  (foreign_code_import
+    (foreign_code_item
+      object: (string))))
+
+==================
+Foreign Code Import (library, and several items across lines)
+==================
+import code from library "CleanSerial_library"
+import code from "SUBSERVER.OBJ",
+              library "KERNEL32.TXT",
+              library "USER32.TXT",
+---
+
+(source_file
+  (foreign_code_import
+    (foreign_code_item
+      object: (string)))
+  (foreign_code_import
+    (foreign_code_item
+      object: (string))
+    (foreign_code_item
+      object: (string))
+    (foreign_code_item
+      object: (string))))

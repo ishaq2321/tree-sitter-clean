@@ -16,6 +16,10 @@
         "named": true
       },
       {
+        "type": "foreign_code_import",
+        "named": true
+      },
+      {
         "type": "foreign_export",
         "named": true
       },
@@ -1859,6 +1863,37 @@
         "types": [
           {
             "type": "integer",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "foreign_code_import",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "foreign_code_item",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "foreign_code_item",
+    "named": true,
+    "fields": {
+      "object": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string",
             "named": true
           }
         ]
@@ -4174,6 +4209,10 @@
           {
             "type": "type_variable",
             "named": true
+          },
+          {
+            "type": "uniqueness_type",
+            "named": true
           }
         ]
       },
@@ -4978,6 +5017,10 @@
   },
   {
     "type": "let",
+    "named": false
+  },
+  {
+    "type": "library",
     "named": false
   },
   {

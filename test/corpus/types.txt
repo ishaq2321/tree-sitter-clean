@@ -492,3 +492,30 @@ Parenthesised Abstract Newtype
       rhs: (type_application
         (constructor)
         (constructor)))))
+
+==================
+Unique Type Variable in a Synonym Parameter List
+==================
+:: * Input *a =
+{	offside	:: !Bool
+,	curpos	:: !Int
+};
+---
+
+(source_file
+  (type_definition
+    name: (constructor)
+    parameter: (uniqueness_type
+      (uniqueness_star)
+      (type_variable
+        (identifier)))
+    body: (type_definition_body
+      rhs: (record_definition
+        (record_field
+          name: (identifier)
+          type: (strict_type
+            (constructor)))
+        (record_field
+          name: (identifier)
+          type: (strict_type
+            (constructor)))))))
