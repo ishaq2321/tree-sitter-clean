@@ -1533,14 +1533,14 @@ module.exports = grammar({
       seq(
         "where",
         $._inline_layout_start,
-        layoutBlockMembers($, $.local_binding),
+        layoutBlockMembers($, choice($.local_binding, $.record_binding)),
       ),
 
     with_block: ($) =>
       seq(
         "with",
         $._inline_layout_start,
-        layoutBlockMembers($, $.local_binding),
+        layoutBlockMembers($, choice($.local_binding, $.record_binding)),
       ),
 
     local_binding: ($) =>
@@ -1553,11 +1553,24 @@ module.exports = grammar({
         // LHS is a pattern that cannot be a function name (a plain `x = e` is
         // already a `function_declaration`).
         prec(1, seq(
-          field("pattern", choice($.tuple_pattern, $.list_pattern, $.record_pattern, $.paren_pattern, $.lazy_pattern, $.strict_pattern, $.wildcard)),
+          field("pattern", choice($.tuple_pattern, $.list_pattern, $.paren_pattern, $.lazy_pattern, $.strict_pattern, $.wildcard)),
           "=",
           field("value", $._expression),
         )),
+        // `# {field} = e` — binding a record pattern. Split out from the rule
+        // above so that `let` can take every OTHER binding without also taking
+        // this one, which is what makes a brace inside `let` unambiguously a
+        // `let_group`. See `_let_binding`.
+        prec(1, $.record_binding),
       ),
+
+    // `{ field, field2 } = e` — a record pattern bound to a value.
+    record_binding: ($) =>
+      prec(1, seq(
+        field("pattern", $.record_pattern),
+        "=",
+        field("value", $._expression),
+      )),
 
     // ─────────────────────────────────────────────────────────────────────
     // Patterns
@@ -1916,12 +1929,99 @@ module.exports = grammar({
         seq(
           "let",
           optional($._layout_start),
-          repeat1(seq($.local_binding, optional(choice(";", $._layout_semicolon)))),
+          repeat1(
+            seq(
+              choice($.local_binding, $.let_group),
+              optional(choice(";", $._layout_semicolon)),
+            ),
+          ),
           optional($._layout_end),
           "in",
           field("body", $._expression),
         ),
       ),
+
+    // `let { (GtkBoxP p) = gtk } in p` — a brace-delimited GROUP of bindings.
+    //
+    // This is not a record pattern, which is the reading that looks obvious
+    // from the braces: a record pattern's members are FIELD NAMES, and
+    // `(GtkBoxP p)` is not a field name. It is the multi-binding form of `let`,
+    // and it is how the whole Gtk FFI layer destructures its own wrapper types
+    // (`GtkBoxP2GtkContainerP gtk :== let { (GtkBoxP p) = gtk } in p;` in
+    // every gtk_*.icl), so it was the first unreadable construct in ~50 corpus
+    // files. Members are ordinary patterns, which is what separates this from
+    // the record-pattern reading and gives the GLR fork something to resolve.
+    // `let` takes `local_binding` and `let_group`, and NOT `record_binding`.
+    //
+    // Inside `let`, a brace is a GROUP — `let { cps = getCriticalPairs ... }`,
+    // and `let { (GtkBoxP p) = gtk }` throughout the Gtk FFI layer — and every
+    // `let {` in the corpus puts the `=` inside the braces. Letting a record
+    // pattern bind here as well makes `{x` ambiguous between a group member and
+    // a record-pattern field, which needs a `_pattern`/`_field_name` conflict;
+    // tree-sitter conflicts are GLOBAL, so declaring it also forks every `{` in
+    // argument position and measurably regressed PmCleanSystem.icl (3 problem
+    // nodes -> 6). Excluding the record binding from `let` removes the
+    // ambiguity at its source, and `where`/`#` blocks still take it.
+    let_group: ($) =>
+      seq(
+        "{",
+        seq(
+          field("pattern", $._group_member),
+          "=",
+          field("value", $._expression),
+          repeat(seq(",", field("pattern", $._group_member), "=", field("value", $._expression))),
+        ),
+        optional(","),
+        "}",
+      ),
+
+    // The member patterns of a `let_group`: `_pattern` WITHOUT `identifier` and
+    // `record_pattern`, with `_field_name` added back for the bare-binding-name
+    // form.
+    //
+    // Leaving `identifier` in is what forces the `_pattern` / `_field_name`
+    // conflict, because after `let {` both a group member and a record-pattern
+    // field can be a plain identifier and one token of lookahead cannot tell
+    // them apart. tree-sitter conflicts are GLOBAL, so declaring it also forks
+    // every `{` in argument position — which measurably regressed
+    // PmCleanSystem.icl from 3 problem nodes to 6. Naming the bare form
+    // explicitly as a FIELD NAME removes the overlap instead: after `let {` a
+    // bare name is a binding name, never a record-pattern field, so the two
+    // rules are no longer both live and no conflict is needed.
+    //
+    // `record_pattern` is excluded for the same reason — a brace inside `let`
+    // opens the group — while `where` and `#` blocks keep binding record
+    // patterns through `record_binding`.
+    // The precedence resolves the remaining reduce/reduce: after `let {` a
+    // bare identifier could reduce to `_field_name` (a record-pattern field) or
+    // to a group member, and the group reading is the right one because
+    // `record_binding` is not among a `let`'s bindings. Preferring it here
+    // rather than declaring a conflict keeps the fork out of argument position.
+    _group_member: ($) =>
+      prec(1, choice(
+        $.wildcard,
+        $.lazy_pattern,
+        $.strict_pattern,
+        $.number,
+        $.string,
+        $.char,
+        $.char_list,
+        $.tuple_pattern,
+        $.list_pattern,
+        $.paren_pattern,
+        $.unit_pattern,
+        // The bare binding name — `let { cps = getCriticalPairs ... }`,
+        // `let { ems = results ns }`. Plain `identifier`, NOT `_field_name`:
+        // `_field_name` also admits `single_quoted_name`, and
+        // `constructor_pattern` and `strict_binding_pattern` both begin with a
+        // name, so a group member that could be any of those re-introduces a
+        // reduce/reduce against `function_declaration`'s own record-pattern
+        // argument. Every bare group member in the corpus is a plain
+        // identifier, and the parenthesised form — `let { (GtkBoxP p) = gtk }`,
+        // the whole Gtk FFI layer — arrives through `paren_pattern`, so nothing
+        // the corpus needs is lost.
+        $.identifier,
+      )),
 
     // `# pat = expr` and `#! pat = expr` — strict local bindings (let-before)
     let_before_expression: ($) =>

@@ -3058,10 +3058,84 @@
       "required": true,
       "types": [
         {
+          "type": "let_group",
+          "named": true
+        },
+        {
           "type": "local_binding",
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "let_group",
+    "named": true,
+    "fields": {
+      "pattern": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "char",
+            "named": true
+          },
+          {
+            "type": "char_list",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "lazy_pattern",
+            "named": true
+          },
+          {
+            "type": "list_pattern",
+            "named": true
+          },
+          {
+            "type": "number",
+            "named": true
+          },
+          {
+            "type": "paren_pattern",
+            "named": true
+          },
+          {
+            "type": "strict_pattern",
+            "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          },
+          {
+            "type": "tuple_pattern",
+            "named": true
+          },
+          {
+            "type": "unit_pattern",
+            "named": true
+          },
+          {
+            "type": "wildcard",
+            "named": true
+          }
+        ]
+      },
+      "value": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "_expression",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -3200,10 +3274,6 @@
             "named": true
           },
           {
-            "type": "record_pattern",
-            "named": true
-          },
-          {
             "type": "strict_pattern",
             "named": true
           },
@@ -3242,6 +3312,10 @@
         },
         {
           "type": "operator_definition",
+          "named": true
+        },
+        {
+          "type": "record_binding",
           "named": true
         },
         {
@@ -3602,6 +3676,32 @@
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "record_binding",
+    "named": true,
+    "fields": {
+      "pattern": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "record_pattern",
+            "named": true
+          }
+        ]
+      },
+      "value": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "_expression",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -4759,6 +4859,10 @@
         {
           "type": "local_binding",
           "named": true
+        },
+        {
+          "type": "record_binding",
+          "named": true
         }
       ]
     }
@@ -4773,6 +4877,10 @@
       "types": [
         {
           "type": "local_binding",
+          "named": true
+        },
+        {
+          "type": "record_binding",
           "named": true
         }
       ]
