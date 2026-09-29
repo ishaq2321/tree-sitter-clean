@@ -1529,6 +1529,27 @@ module.exports = grammar({
     // `where`/`with` may open its block on the SAME line as its binding (e.g.
     // `... = b with (ys,zs) = span p xs`), and the scanner must push a layout
     // level for that line's indentation so a later dedent can close the block.
+    // KNOWN GAP: `where { cstate =: ...; wid =: ...; }` — a brace-delimited
+    // binding block. iolib's deltaControls and deltaDialog, and 13 other corpus
+    // files, write it, and it is unreadable at v1.2.7.
+    //
+    // It is not affordable, and the reason is the ceiling rather than the
+    // syntax. A member of the block is an ordinary `local_binding`, and a
+    // `function_declaration` member takes its OWN optional trailing `;` — so
+    // `where { x =: 1; }` has two readings of that `;` (ends the member, or
+    // separates members) that one token of lookahead cannot settle, and the
+    // separator therefore has to be `optional`, not required. Measured:
+    //
+    //   optional separator     67,459 actions   FAILS (limit 65,535)
+    //   required separator     65,583 actions   FAILS by 48 — and it does not
+    //                                            parse the corpus form either,
+    //                                            because the member eats the `;`
+    //
+    // So the cheap version is cheap by being wrong, and the correct one does
+    // not fit. The layout form (`where` then indented members) parses these
+    // same bindings fine, so nothing else regresses; what is lost is 15 files
+    // that open the block with a brace. Reclaiming the headroom needs a
+    // structural saving elsewhere, not another spelling here.
     where_block: ($) =>
       seq(
         "where",
@@ -1962,6 +1983,19 @@ module.exports = grammar({
     // argument position and measurably regressed PmCleanSystem.icl (3 problem
     // nodes -> 6). Excluding the record binding from `let` removes the
     // ambiguity at its source, and `where`/`#` blocks still take it.
+    // The separator between `let_group` members and before its `}`: `;` only.
+    //
+    // One choice rather than two independent optionals — written as separate
+    // optionals the rule needs a distinct LR state per combination of "saw a
+    // `;`" and "saw a `,`" per member, and that alone pushed the table past the
+    // 65,535 limit.
+    //
+    // The comma is left out on evidence, not on taste: no `let_group` in the
+    // corpus uses one, and ADDING it measurably regressed two files
+    // (eastwood Symbol.icl 1 -> 12 problem nodes and newly wrapped;
+    // PmCleanSystem.icl 3 -> 6), so the comma is not a free spelling here.
+    _group_separator: ($) => ";",
+
     let_group: ($) =>
       seq(
         "{",
@@ -1969,9 +2003,23 @@ module.exports = grammar({
           field("pattern", $._group_member),
           "=",
           field("value", $._expression),
-          repeat(seq(",", field("pattern", $._group_member), "=", field("value", $._expression))),
+          // `;` is the separator, and it is the ONLY separator: no `let_group`
+          // in the corpus uses a comma, and adding one is not free here — it
+          // measurably regressed two files (eastwood Symbol.icl 1 -> 12 problem
+          // nodes and newly wrapped, PmCleanSystem.icl 3 -> 6) by changing LR
+          // states far from any let_group.
+          //
+          // It is a literal here rather than a shared hidden rule: this grammar
+          // sits close to the 65,535 action-table ceiling (see GRAMMAR-GAPS.md),
+          // and a one-symbol rule costs a reduce that a literal does not.
+          repeat(seq(
+            ";",
+            field("pattern", $._group_member),
+            "=",
+            field("value", $._expression),
+          )),
+          optional(";"),
         ),
-        optional(","),
         "}",
       ),
 

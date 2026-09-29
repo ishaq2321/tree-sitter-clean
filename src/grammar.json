@@ -7544,6 +7544,10 @@
         ]
       }
     },
+    "_group_separator": {
+      "type": "STRING",
+      "value": ";"
+    },
     "let_group": {
       "type": "SEQ",
       "members": [
@@ -7581,7 +7585,7 @@
                 "members": [
                   {
                     "type": "STRING",
-                    "value": ","
+                    "value": ";"
                   },
                   {
                     "type": "FIELD",
@@ -7605,18 +7609,18 @@
                   }
                 ]
               }
-            }
-          ]
-        },
-        {
-          "type": "CHOICE",
-          "members": [
-            {
-              "type": "STRING",
-              "value": ","
             },
             {
-              "type": "BLANK"
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "STRING",
+                  "value": ";"
+                },
+                {
+                  "type": "BLANK"
+                }
+              ]
             }
           ]
         },

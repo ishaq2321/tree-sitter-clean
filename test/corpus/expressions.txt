@@ -500,7 +500,7 @@ scan dir world
 Let with a Brace-Delimited Group of Bindings
 ==================
 GtkBoxP2GtkContainerP gtk :== let { (GtkBoxP p) = gtk } in p;
-g = let { cps = getCriticalPairs r, ems = results ns } in (cps, ems)
+g = let { cps = getCriticalPairs r; ems = results ns } in (cps, ems)
 ---
 
 (source_file
@@ -530,3 +530,38 @@ g = let { cps = getCriticalPairs r, ems = results ns } in (cps, ems)
       body: (tuple_expression
         (identifier)
         (identifier)))))
+
+==================
+Let Group with a Trailing Semicolon
+==================
+GtkBoxP2GtkContainerP gtk :== let { (GtkBoxP p) = gtk; } in p;
+g = let { (C p) = g; (D q) = h; } in p
+---
+
+(source_file
+  (macro_definition
+    name: (constructor)
+    (identifier)
+    body: (let_expression
+      (let_group
+        pattern: (paren_pattern
+          (constructor_pattern
+            constructor: (constructor)
+            argument: (identifier)))
+        value: (identifier))
+      body: (identifier)))
+  (function_declaration
+    name: (identifier)
+    body: (let_expression
+      (let_group
+        pattern: (paren_pattern
+          (constructor_pattern
+            constructor: (constructor)
+            argument: (identifier)))
+        value: (identifier)
+        pattern: (paren_pattern
+          (constructor_pattern
+            constructor: (constructor)
+            argument: (identifier)))
+        value: (identifier))
+      body: (identifier))))

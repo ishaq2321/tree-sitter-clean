@@ -1951,3 +1951,69 @@ The gate is the arbiter: if no corpus file exercises a rule, delete it rather
 than keep it "for completeness" — it costs rows, a conflict declaration and
 reader attention, and (as `_let_binding_tail` shows) it can be inert while
 looking like the fix.
+
+## 10. New gaps found by parse-health measurement (2,179-file union corpus)
+
+`scripts/parse_health.mjs` measures how much of the language the grammar reads
+at all, and groups each failing file by its TIGHTEST problem node. Two
+properties of that attribution matter, and both were found by being wrong
+first:
+
+* **Attribute to the tightest problem node, not the first.** When one
+  construct is unreadable, recovery can wrap the WHOLE file in a single
+  `ERROR`; 122 of the failing files are like this. Attributing by first node
+  reports "module header" for 442 files whose `implementation module X;`
+  headers parse perfectly, because the `ERROR` merely STARTS at line 1. That
+  sent the first round of work at a construct that is not broken.
+* **A zero-width `ERROR` at a declaration boundary is the rift the PREVIOUS
+  declaration left.** `GtkBoxP2GtkWidgetP gtk :== let { (GtkBoxP p) = gtk }`
+  parses perfectly in isolation; the `let` group is what made the file fail.
+
+### Closed in this pass
+
+| Construct | Form | Files |
+|---|---|---|
+| Foreign code import | `import code from "a.o", library "L"` | 30 |
+| Unique type variable in a synonym parameter list | `:: * Input *a = { ... }` | 25 |
+| `let` brace group | `let { (GtkBoxP p) = gtk; }` | 53 |
+
+The second of those was a **comment that lied**: `type_definition` has carried
+"Parameters may carry uniqueness (`:: * Input *a = ...`)" since before this
+pass while `type_variable` was a bare `$.identifier`. Clyde's `PmParse.icl:17`
+has exactly that declaration, and that one line wrapped the whole file in an
+`ERROR` spanning 1,328 lines — the worst file in the corpus.
+
+### Open, and why
+
+**`where { cstate =: ...; wid =: ...; }`** — a brace-delimited binding block,
+15 files (iolib's `deltaControls`/`deltaDialog` and 13 others). Not affordable
+at the current action count, and the reason is structural rather than
+syntactic:
+
+| Form | Actions | Result |
+|---|---|---|
+| optional `;` separator | 67,459 | fails the 65,535 ceiling |
+| required `;` separator | 65,583 | fails by 48, **and does not parse the form** |
+
+A block member is a `local_binding`, and a `function_declaration` member takes
+its OWN optional trailing `;`. So in `where { x =: 1; }` there are two
+readings of that `;` — it ends the member, or it separates members — and one
+token of lookahead cannot settle it, which forces the separator to be
+optional. The cheap version is cheap by being wrong: the member eats the `;`
+and the block then asks for another.
+
+The layout form (`where`, then indented members) parses these same bindings
+fine, so this costs 15 files and nothing else. Reclaiming the headroom needs a
+structural saving elsewhere — see the rejected-measures list above for the
+candidates already tried — not another spelling here.
+
+### The comma is not a free spelling
+
+`let_group` accepts `;` and NOT `,`. No `let_group` in the corpus uses a comma,
+but adding one is not free: it changed LR states far from any `let_group` and
+regressed `eastwood/.../Symbol.icl` (1 -> 12 problem nodes, 94 -> 20,259 error
+bytes, newly wrapped) and `PmCleanSystem.icl` (3 -> 6). Inlining the separator
+literal instead of routing it through a shared rule changed nothing. The
+`;`-only form is 29 corpus files better overall (1,627 -> 1,656 parse-clean,
+24,991 -> 24,738 problem nodes) and costs those two already-failing files;
+the comma variant is 29 files worse.
