@@ -34,9 +34,35 @@ Set them with `gh secret set NAME -R ishaq2321/tree-sitter-clean`.
 
    ```bash
    rm -f src/parser.c
-   npx tree-sitter generate
+   npx tree-sitter generate --abi 15
    npx tree-sitter test
    ```
+
+   **`--abi 15` is not optional, and `tree-sitter generate`'s own help is
+   wrong about it.** The help says the default is 15 and that `--abi=latest`
+   is the newest supported; on tree-sitter CLI 0.26.9 a bare
+   `tree-sitter generate` on this grammar emits `#define LANGUAGE_VERSION 14`,
+   because v1.2.7's shipped `parser.c` was generated at 15. Regenerating without
+   the flag therefore **silently downgrades the ABI in a patch release** — the
+   version number says 1.2.8 while the artifact requires a different runtime
+   generation than 1.2.7 did, and nothing in the diff says so. Always check:
+
+   ```bash
+   grep -m1 '^#define LANGUAGE_VERSION' src/parser.c   # must be 15
+   ```
+
+   The two are not interchangeable here: the ABI-15 build regresses 3 corpus
+   files where the ABI-14 build regressed 4, and it improves
+   `PmParse.icl` 137 -> 136 problem nodes where ABI-14 reached 137 -> 125 only
+   by way of a differently-shaped parse. Ship ABI 15.
+
+   **`rm -f src/parser.c` is load-bearing too.** An incremental generate
+   leaves `src/parser.c` differing from a clean one (1,461 insertions /
+   1,581 deletions at v1.2.8) with identical behaviour on all 2,179 corpus
+   files — the delta is LR state ORDERING. That is survivable, but it means an
+   incremental generate is never a candidate for a release whose bytes anyone
+   will pin, because you cannot tell a harmless reordering from a real one
+   without a full corpus run.
 
 3. **Check for action-table corruption** — the generated parser overflows
    silently past 65536 actions (16-bit limit). The build MUST be clean:
@@ -124,5 +150,13 @@ Set them with `gh secret set NAME -R ishaq2321/tree-sitter-clean`.
 - **Published versions are immutable** — npm, crates.io, and PyPI all
   reject re-uploads. If a job fails partway, fix and publish the *next*
   version; never reuse a version number.
+- **A `.wasm` build is NOT byte-deterministic.** Two consecutive
+  `tree-sitter build --wasm` runs over the same `src/parser.c` produced
+  different sha256s at v1.2.8 (`212e538c…` and `262e6b90…`). So a wasm hash
+  is not a function of the source across runs, and a consumer pinning bytes
+  should pin the **ID-ORDER / TYPE-SET / FIELD-SET digests** through
+  web-tree-sitter — the enumerable surface — rather than the file hash. This
+  matches what `backbencher-brain`'s `validation/m14/grammar-pins.json`
+  already does for every lane, and the reason its rule text says so.
 - **crates.io needs a verified email on the account**, separate from
   cargo login.

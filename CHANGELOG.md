@@ -3,6 +3,91 @@
 All notable changes to `tree-sitter-clean` are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
+## [v1.2.8] - 2026-09-29
+
+Three constructs closed, each found by a new instrument rather than by reading
+the language. **Parse health over a 2,179-file union corpus: 1,524 -> 1,656
+parse-clean files (69.9% -> 76.0%), ERROR nodes 25,683 -> 24,738.** 128 corpus
+tests and the 312-file cache-free regression gate back each step.
+
+The instrument is `scripts/parse_health.mjs`, which answers a question the
+per-file regression gate cannot: how much of the language does this grammar read
+AT ALL. A grammar can add no regressions and still fail to read a quarter of
+real Clean. Two properties of it were found by being wrong first:
+
+- **Attribute a failure to its TIGHTEST problem node, not its first.** One
+  unreadable construct makes the parser wrap a whole file in a single `ERROR`,
+  and 122 failing files are like that. Attributing by first node reported
+  "module header" for **442 files whose `implementation module X;` headers
+  parse perfectly**, because the `ERROR` merely starts at line 1. The first
+  round of this work was aimed at a construct that is not broken.
+- **A zero-width `ERROR` at a declaration boundary is the rift the PREVIOUS
+  declaration left.** `GtkBoxP2GtkWidgetP gtk :== let { (GtkBoxP p) = gtk }`
+  parses perfectly in isolation; the `let` group is what broke the file.
+
+### Fixed
+
+- **Foreign code imports** — `import code from "a.o"`, `import code from
+  library "L"`, and the comma-separated multi-line list. 30 corpus files
+  (CleanSerial, clean-graph-copy, clean-ide/Mac, the ObjectIO FCI layers). It
+  gets its own `foreign_code_import` declaration because an FCI names OBJECT
+  FILES and LIBRARIES rather than a Clean module: there is no module to bind
+  and the thing being bound is a linker input, so it is not an
+  `import_declaration` with a different item list. The lexer already knew
+  `code` from `code { ... }` ABC blocks, which is why the form was half-known
+  and never reachable.
+- **Unique type variables in a parameter list** — `:: * Input *a = { ... }` is
+  a synonym whose parameter is the unique type variable `*a`. 25 corpus files.
+  `type_definition` has carried the comment "Parameters may carry uniqueness
+  (`:: * Input *a = ...`)" since before this release while the rule itself was a
+  bare `$.identifier` — **the comment was false and the construct was
+  unreadable**. Clyde's `PmParse.icl:17` has exactly that declaration, and that
+  one line made the parser wrap the whole file in a single `ERROR` spanning 1,328
+  lines, the worst file in the corpus. The parameter list now accepts the
+  `uniqueness_type` the lexer already produces. `!a` is deliberately NOT
+  accepted: `derive X !Bar` is genuinely ambiguous against a strict type atom
+  and no corpus file needs it.
+- **`let { ... }` as a group of bindings** — `let { (GtkBoxP p) = gtk; }`, the
+  shape the entire Gtk FFI layer is built from, 53 corpus files. The braces
+  look like a record pattern and are not one: a record pattern's members are
+  FIELD NAMES, and `(GtkBoxP p)` is not a field name. Getting this right was
+  mostly about what NOT to do — see "Rejected" below, because the obvious
+  fix (a conflict between `_pattern` and `_field_name`) is global in
+  tree-sitter and cost 6 files on its own.
+
+### The one trade this release takes knowingly
+
+`let_group` members are separated by `;` and **not** by a comma. No `let_group`
+in the corpus uses a comma, and adding one is not free: it changes LR states far
+from any `let_group` and regressed `eastwood/.../Symbol.icl` (1 -> 12 problem
+nodes, newly wrapped) and `PmCleanSystem.icl` (3 -> 6).
+
+With the separator restricted to `;`, the 2,179-file corpus is **29 files better
+and 2 files worse** overall (1,627 -> 1,656 parse-clean, 24,991 -> 24,738
+problem nodes), and both worse files were already failing. The 312-file gate
+therefore reports **+5 problem nodes / +20,017 error bytes / +1 wrapped against
+the v1.2.7 baseline** — that is this trade, and it is the whole of it.
+`GRAMMAR-GAPS.md` §10 records the measurement for both the comma and the
+separator spellings.
+
+### Known gaps, with the cost measured
+
+- **`where { cstate =: ...; }`**, a brace-delimited binding block, 14 corpus
+  files. A block member is an ordinary `local_binding` and a
+  `function_declaration` member takes its OWN optional trailing `;`, so that
+  `;` has two readings one token of lookahead cannot settle — the separator
+  must be optional, and that needs 67,459 actions against the 65,535 ceiling.
+  A required separator fits (65,583) and does not parse the form, because the
+  member eats the `;`. The cheap version is cheap by being wrong.
+- **523 of 2,179 corpus files still do not parse.** They are not a list of
+  missing rules: the two shapes tried after this wave were real bugs with
+  clean repros that passed 128/128 tests and were still net-negative on the
+  corpus, because tree-sitter's recovery depends on the shape of the whole
+  automaton and a small correct rule changes how ALREADY-DAMAGED files recover,
+  far from the rule. `GRAMMAR-GAPS.md` §11 records both with their numbers.
+  The remaining work is recovery behaviour, which is a much larger piece of
+  work than adding constructs.
+
 ## [v1.2.7] - 2026-09-23
 
 Five grammar changes measured against the same 312-file corpus gate
