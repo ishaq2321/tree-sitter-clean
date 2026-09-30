@@ -2017,3 +2017,60 @@ literal instead of routing it through a shared rule changed nothing. The
 `;`-only form is 29 corpus files better overall (1,627 -> 1,656 parse-clean,
 24,991 -> 24,738 problem nodes) and costs those two already-failing files;
 the comma variant is 29 files worse.
+
+## 11. Post-wave: two CORRECT rules that were still net-negative, and why
+
+After the v1.2.8 work (1,524 -> 1,656 parse-clean files), 523 files still fail.
+The next two shapes were both small, both real, both fully testable — and **both
+were rejected on measurement**, for the same non-obvious reason. This section
+exists so the next attempt does not spend two more cycles rediscovering it.
+
+### The effect: a new production shifts RECOVERY, not just parsing
+
+tree-sitter's error recovery depends on the shape of the whole automaton, so
+adding a small correct rule changes how *already-damaged* files recover, far from
+the rule. Both attempts below passed `tree-sitter generate` with no conflict and
+passed 128/128 corpus tests, and both made the corpus worse:
+
+| Attempt | Files in the shape | Parse-clean gained | Files regressed | Worst case |
+|---|---|---|---|---|
+| `(a,b) = e` top-level pattern definition | 16 | **0** | 6 | `PmCleanSystem.icl` 6 -> 37 |
+| `(FWI)` parenthesised UPPERCASE name | 17 | 4 | **44** | `EstherBackend.icl` 215 -> 396 |
+
+The second is the instructive one. `parenthesized_name` was `seq("(",
+$.identifier, ")")`, and `(FWI)`, `(BYTE)`, `(LONG)`, `(WORD)` are uppercase, so
+they lex as `constructor` and never matched — a real bug, 17 corpus files, and
+`(+) infixl 9` parsed fine the whole time because an operator takes the sibling
+rule. The first fix — add `$.constructor` to `parenthesized_name` — fixed 4 files
+and broke 44, because that rule is also reached from EXPRESSION position, and
+letting `(` + `constructor` start a parenthesised name changed the LR state for
+`(`: `GenMapSt.icl` went 10 -> 87 problem nodes on a single line,
+`= (PAIR x y, st)`.
+
+Narrowing it to declaration positions only (a hidden `_paren_upper_name`, aliased
+back to `parenthesized_name` at each use so the node-type surface did not move and
+the analyzer needed no new case) fixed the four repros and all 128 tests, and
+**still** left `GenMapSt.icl` at 10 -> 87. So the damage was not the expression
+leak; it was the production's existence at all.
+
+**Rule of thumb earned: judge a grammar change on the corpus file count, never on
+its own repros.** A correct rule that fixes 4 files and wrecks 44 is a
+regression, and 128/128 green tests will not tell you.
+
+### What this means for the remaining 523
+
+- `where { cstate =: ...; }` (14 files) — genuinely blocked by the action ceiling
+  (§10).
+- `(a,b) = e` (16 files) and `(FWI) infixl 9` (17 files) — real gaps, measured,
+  rejected, and the reason is above rather than a syntax problem.
+- `{ rec & Mod.field = v }`, an UPPERCASE head on a dotted record-update path
+  (2 files, 5 sites) — the same uppercase/lexing class, and deliberately NOT
+  attempted after two neighbours in the same area measured negative.
+- The 110 files attributed to a `=`/`|` continuation line are mostly forms that
+  already parse in isolation; they are the long tail of files damaged *elsewhere*
+  and mis-attributed, not one shape.
+- 31 files attributed to an unreadable signature are unattempted.
+
+So the honest position is that the remaining work is **not** a list of missing
+rules. It is the recovery behaviour of files that are damaged for other reasons,
+which is a different and much larger piece of work than adding constructs.
